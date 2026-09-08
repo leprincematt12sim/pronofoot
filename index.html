@@ -1,0 +1,63 @@
+﻿<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>⚽ PronoFoot — Pronostics Européens</title>
+  <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+  <nav class="top-nav">
+    <div class="nav-brand">⚽ PronoFoot</div>
+    <div class="nav-user">
+      <div class="nav-points" id="navPoints">⭐ 0 pts</div>
+    </div>
+  </nav>
+
+  <nav class="bottom-nav">
+    <button class="bottom-nav-item active" onclick="navigateTo('dashboard')"><span>🏠</span><span>Accueil</span></button>
+    <button class="bottom-nav-item" onclick="navigateTo('matches')"><span>⚽</span><span>Matchs</span></button>
+    <button class="bottom-nav-item" onclick="navigateTo('leaderboard')"><span>🏆</span><span>Classement</span></button>
+  </nav>
+
+  <div class="main-content">
+    <div class="page-section active" id="page-dashboard">
+      <div class="welcome-banner">
+        <h2 id="welcomeMsg">Bienvenue ! 👋</h2>
+        <p>Pronostiquez les matchs des 5 grands championnats européens.</p>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-value" id="statPoints">0</div><div class="stat-label">Points totaux</div></div>
+        <div class="stat-card"><div class="stat-value" id="statPredictions">0</div><div class="stat-label">Pronostics faits</div></div>
+      </div>
+      <button class="btn btn-primary" onclick="navigateTo('matches')">Faire mes pronostics →</button>
+    </div>
+
+    <div class="page-section" id="page-matches">
+      <div class="section-header">
+        <h3>⚽ Matchs & Pronostics</h3>
+        <button class="btn btn-primary" onclick="saveAll()">💾 Tout sauvegarder</button>
+      </div>
+      <div class="league-tabs">
+        <button class="league-tab active" onclick="filterLeague('all')">🌍 Tous</button>
+        <button class="league-tab" onclick="filterLeague('premier')">🏴 PL (7)</button>
+        <button class="league-tab" onclick="filterLeague('laliga')">🇪🇸 Liga (3)</button>
+        <button class="league-tab" onclick="filterLeague('seriea')">🇮🇹 Serie A (5)</button>
+        <button class="league-tab" onclick="filterLeague('bundesliga')">🇩🇪 BuLi (2)</button>
+        <button class="league-tab" onclick="filterLeague('ligue1')">🇫🇷 L1 (2)</button>
+      </div>
+      <div id="matchesContainer"></div>
+    </div>
+
+    <div class="page-section" id="page-leaderboard">
+      <div class="section-header">
+        <h3>🏆 Classement Général</h3>
+      </div>
+      <div id="leaderboardContainer"></div>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
