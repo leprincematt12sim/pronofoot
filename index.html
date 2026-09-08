@@ -3,51 +3,37 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>⚽ PronoFoot — Saison 2026-27</title>
+  <title>⚽ PronoFoot — Compétition entre amis</title>
   <link rel="stylesheet" href="css/main.css">
 </head>
 <body>
 
-  <!-- ÉCRAN CONNEXION / INSCRIPTION -->
+  <!-- CONNEXION -->
   <div class="auth-overlay" id="authScreen" style="display:none">
     <div class="auth-card">
       <div class="auth-header">
         <h1>⚽ PronoFoot</h1>
-        <p>Pronostics des 5 grands championnats & UCL</p>
+        <p>Compétition de pronostics entre amis !</p>
       </div>
       <div class="auth-tabs">
         <button class="auth-tab active" onclick="switchAuth('login')">Connexion</button>
         <button class="auth-tab" onclick="switchAuth('register')">Inscription</button>
       </div>
       <div id="authError" style="color:var(--accent);font-size:0.85rem;margin-bottom:12px;display:none"></div>
-
       <form id="loginForm" onsubmit="handleLogin(event)">
-        <div class="form-group">
-          <label>👤 Pseudo ou Email</label>
-          <input type="text" id="loginUser" placeholder="Ex: Admin" required>
-        </div>
-        <div class="form-group">
-          <label>🔒 Mot de passe</label>
-          <input type="password" id="loginPass" placeholder="••••••••" required>
-        </div>
+        <div class="form-group"><label>👤 Pseudo</label><input type="text" id="loginUser" placeholder="Ton pseudo" required></div>
+        <div class="form-group"><label>🔒 Mot de passe</label><input type="password" id="loginPass" placeholder="••••••" required></div>
         <button type="submit" class="btn btn-primary" style="width:100%;margin-top:10px">Se connecter →</button>
         <p style="text-align:center;margin-top:12px;font-size:0.75rem;color:var(--text-dim)">Admin : Admin / admin123</p>
       </form>
-
       <form id="registerForm" style="display:none" onsubmit="handleRegister(event)">
-        <div class="form-group">
-          <label>👤 Pseudo</label>
-          <input type="text" id="regUser" placeholder="Choisissez un pseudo" required minlength="3">
-        </div>
-        <div class="form-group">
-          <label>📧 Email</label>
-          <input type="email" id="regEmail" placeholder="votre@email.com" required>
-        </div>
-        <div class="form-group">
-          <label>🔒 Mot de passe</label>
-          <input type="password" id="regPass" placeholder="Min. 6 caractères" required minlength="6">
-        </div>
-        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:10px">Créer mon compte →</button>
+        <div class="form-group"><label>👤 Pseudo</label><input type="text" id="regUser" placeholder="Ex: Mathis_92" required minlength="3"></div>
+        <div class="form-group"><label>📧 Email</label><input type="email" id="regEmail" placeholder="ton@email.com" required></div>
+        <div class="form-group"><label>🔒 Mot de passe</label><input type="password" id="regPass" placeholder="Min. 6 caractères" required minlength="6"></div>
+        <label style="font-size:0.75rem;color:var(--text-muted);display:flex;align-items:center;gap:6px;margin-bottom:12px">
+          <input type="checkbox" id="regAccept" required> J'accepte les <a onclick="navigateTo('legal')" style="color:var(--accent);cursor:pointer">règles et la politique de confidentialité</a>
+        </label>
+        <button type="submit" class="btn btn-primary" style="width:100%">Rejoindre la compétition →</button>
       </form>
     </div>
   </div>
@@ -66,7 +52,7 @@
       <button class="bottom-nav-item active" onclick="navigateTo('dashboard')"><span>🏠</span><span>Accueil</span></button>
       <button class="bottom-nav-item" onclick="navigateTo('matches')"><span>⚽</span><span>Matchs</span></button>
       <button class="bottom-nav-item" onclick="navigateTo('leaderboard')"><span>🏆</span><span>Classement</span></button>
-      <button class="bottom-nav-item" onclick="navigateTo('bonuses')"><span>🎯</span><span>Bonus</span></button>
+      <button class="bottom-nav-item" onclick="navigateTo('rules')"><span>📜</span><span>Règles</span></button>
       <button class="bottom-nav-item" onclick="navigateTo('admin')" id="adminNavBtn" style="display:none"><span>⚙️</span><span>Admin</span></button>
     </nav>
 
@@ -76,25 +62,26 @@
       <div class="page-section active" id="page-dashboard">
         <div class="welcome-banner">
           <h2 id="welcomeMsg">Bienvenue ! 👋</h2>
-          <p>Pronostiquez tous les matchs officiels 2026-27 !</p>
+          <p>Pronostique les matchs et grimpe au classement !</p>
         </div>
-        <div id="announcementBox" style="display:none;background:var(--bg-card);border:1px solid var(--gold);padding:12px 16px;border-radius:var(--radius-sm);margin-bottom:20px;color:var(--gold)">
-          📢 <span id="announcementText"></span>
-        </div>
+        <div id="announcementBox" style="display:none;background:var(--bg-card);border:1px solid var(--gold);padding:12px 16px;border-radius:var(--radius-sm);margin-bottom:20px;color:var(--gold)">📢 <span id="announcementText"></span></div>
         <div class="stats-grid">
-          <div class="stat-card"><div class="val" id="statPoints">0</div><div class="lbl">Points</div></div>
+          <div class="stat-card"><div class="val" id="statPoints">0</div><div class="lbl">Mes Points</div></div>
+          <div class="stat-card"><div class="val" id="statRank">#-</div><div class="lbl">Mon Rang</div></div>
           <div class="stat-card"><div class="val" id="statPredictions">0</div><div class="lbl">Pronostics</div></div>
-          <div class="stat-card"><div class="val" id="statRank">#-</div><div class="lbl">Classement</div></div>
-          <div class="stat-card"><div class="val" id="statExact">0</div><div class="lbl">Scores Exacts</div></div>
+          <div class="stat-card"><div class="val" id="statExact">0</div><div class="lbl">Exacts</div></div>
         </div>
+        <h3 style="margin-bottom:12px">🏆 Classement</h3>
+        <div id="dashboardLeaderboard" style="margin-bottom:20px"></div>
         <button class="btn btn-primary" style="width:100%;padding:14px;font-size:1.05rem" onclick="navigateTo('matches')">⚽ Pronostiquer les matchs →</button>
       </div>
 
       <!-- MATCHS -->
       <div class="page-section" id="page-matches">
+        <div id="leagueBannerArea"></div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;flex-wrap:wrap;gap:10px">
           <h3>⚽ Calendrier 2026-27</h3>
-          <button class="btn btn-primary btn-sm" onclick="saveAll()">💾 Tout Sauvegarder</button>
+          <button class="btn btn-primary btn-sm" onclick="saveAll()">💾 Sauvegarder</button>
         </div>
         <div class="league-tabs">
           <button class="league-tab active" onclick="filterLeague('all')">🌍 Tous</button>
@@ -110,20 +97,91 @@
 
       <!-- CLASSEMENT -->
       <div class="page-section" id="page-leaderboard">
-        <h3 style="margin-bottom:15px">🏆 Classement Général</h3>
+        <h3 style="margin-bottom:5px">🏆 Classement Général</h3>
+        <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:20px">Les points se mettent à jour automatiquement !</p>
+        <div id="podiumContainer" style="margin-bottom:25px"></div>
         <div id="leaderboardContainer"></div>
       </div>
 
       <!-- BONUS -->
       <div class="page-section" id="page-bonuses">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px">
-          <div>
-            <h3>🎯 Bonus de Saison</h3>
-            <p style="font-size:0.85rem;color:var(--text-muted)">Pronostique les vainqueurs pour des points géants !</p>
-          </div>
+          <div><h3>🎯 Bonus de Saison</h3><p style="font-size:0.85rem;color:var(--text-muted)">Pronostique les vainqueurs !</p></div>
           <button class="btn btn-gold btn-sm" onclick="saveBonuses()">💾 Sauvegarder</button>
         </div>
         <div id="bonusesContainer" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:15px"></div>
+      </div>
+
+      <!-- RÈGLES DU JEU -->
+      <div class="page-section" id="page-rules">
+        <h3 style="margin-bottom:15px">📜 Règles du Jeu</h3>
+        <div id="rulesContent">
+          <div class="rules-box">
+            <h3>🎮 Comment jouer ?</h3>
+            <p>PronoFoot est une compétition de pronostics entre amis. Chaque semaine, pronostiquez les scores des matchs des 5 grands championnats européens et de la Ligue des Champions.</p>
+            <h4>📝 Faire un pronostic</h4>
+            <ul>
+              <li>Allez dans l'onglet <strong>⚽ Matchs</strong></li>
+              <li>Entrez le score que vous prédisez pour chaque match (ex: 2-1)</li>
+              <li>Cliquez sur <strong>💾 Sauvegarder</strong></li>
+              <li>Vous pouvez modifier vos pronostics tant que le match n'a pas commencé</li>
+            </ul>
+            <h4>⭐ Système de points</h4>
+            <div class="rules-highlight">
+              <strong>🎯 Score exact = 5 points</strong><br>
+              Vous trouvez le score exact du match (ex: vous dites 2-1, le match finit 2-1)
+            </div>
+            <div class="rules-highlight">
+              <strong>✅ Bon résultat = 3 points</strong><br>
+              Vous trouvez le bon vainqueur ou le match nul, mais pas le score exact (ex: vous dites 3-0, le match finit 2-1 → vous aviez raison que l'équipe à domicile gagne)
+            </div>
+            <div class="rules-highlight">
+              <strong>❌ Mauvais résultat = 0 point</strong><br>
+              Vous n'avez pas trouvé le bon vainqueur
+            </div>
+            <h4>🎯 Bonus de saison</h4>
+            <ul>
+              <li>🏆 Vainqueur Ligue des Champions : <strong>+75 points</strong></li>
+              <li>🥇 Champion national (PL, Liga, Serie A, BuLi, L1) : <strong>+50 points chacun</strong></li>
+            </ul>
+            <h4>🏆 Classement</h4>
+            <p>Le classement se met à jour <strong>automatiquement</strong> dès que l'administrateur entre les scores des matchs. Vous pouvez voir votre position en temps réel dans l'onglet Classement.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- MENTIONS LÉGALES & CONFIDENTIALITÉ -->
+      <div class="page-section" id="page-legal">
+        <h3 style="margin-bottom:15px">🔒 Politique de Confidentialité & CGU</h3>
+        <div class="rules-box">
+          <h3>1. Informations collectées</h3>
+          <p>Lors de votre inscription, nous collectons uniquement :</p>
+          <ul>
+            <li>Votre <strong>pseudo</strong> (choisi par vous)</li>
+            <li>Votre <strong>adresse email</strong></li>
+            <li>Vos <strong>pronostics</strong> et <strong>points</strong></li>
+          </ul>
+          <h3>2. Stockage des données</h3>
+          <p>Toutes vos données sont stockées <strong>localement dans votre navigateur</strong> (localStorage). Aucune donnée n'est envoyée à un serveur tiers. Si vous videz les données de votre navigateur, vos pronostics seront perdus.</p>
+          <h3>3. Partage des données</h3>
+          <p>Nous ne partageons <strong>aucune donnée</strong> avec des tiers. Vos informations ne sont visibles que par les autres joueurs de la compétition (pseudo et points uniquement).</p>
+          <h3>4. Vos droits</h3>
+          <ul>
+            <li>Vous pouvez <strong>supprimer votre compte</strong> à tout moment en contactant l'administrateur</li>
+            <li>Vous pouvez <strong>modifier votre pseudo</strong> en vous réinscrivant</li>
+            <li>Vous pouvez <strong>vider vos données</strong> en effaçant le cache de votre navigateur</li>
+          </ul>
+          <h3>5. Conditions d'utilisation</h3>
+          <ul>
+            <li>Ce site est destiné à un usage <strong>récréatif et amical</strong></li>
+            <li>Aucun gain financier n'est associé aux pronostics</li>
+            <li>L'administrateur se réserve le droit de modifier les scores en cas d'erreur</li>
+            <li>Les résultats officiels des matchs font foi</li>
+          </ul>
+          <h3>6. Contact</h3>
+          <p>Pour toute question, contactez l'administrateur du groupe via l'email utilisé lors de l'inscription.</p>
+          <p style="margin-top:15px;color:var(--text-dim);font-size:0.8rem">Dernière mise à jour : Juin 2025</p>
+        </div>
       </div>
 
       <!-- PROFIL -->
@@ -138,69 +196,91 @@
         </div>
       </div>
 
-      <!-- ADMIN -->
+      <!-- ADMIN COMPLET -->
       <div class="page-section" id="page-admin">
         <h3 style="margin-bottom:5px">⚙️ Panneau Administrateur</h3>
-        <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:20px">Gérez les scores, les points se recalculent automatiquement en temps réel.</p>
+        <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:20px">Gérez tout : scores, apparence, images, contenu.</p>
 
         <div class="admin-grid">
 
-          <!-- ENTRER LES SCORES MANUELLEMENT -->
-          <div class="admin-card" style="grid-column: 1 / -1">
-            <h4>⚽ Entrer les Scores des Matchs</h4>
-            <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:10px">
-              Entrez le score final d'un match → les points de TOUS les joueurs se recalculent instantanément.
-            </p>
-
-            <div class="league-tabs" style="margin-bottom:10px">
-              <button class="league-tab active" onclick="adminFilterMatches('all')">Tous</button>
-              <button class="league-tab" onclick="adminFilterMatches('champions')">🏆 UCL</button>
-              <button class="league-tab" onclick="adminFilterMatches('premier')">🏴 PL</button>
-              <button class="league-tab" onclick="adminFilterMatches('laliga')">🇪🇸 Liga</button>
-              <button class="league-tab" onclick="adminFilterMatches('seriea')">🇮🇹 Serie A</button>
-              <button class="league-tab" onclick="adminFilterMatches('bundesliga')">🇩🇪 BuLi</button>
-              <button class="league-tab" onclick="adminFilterMatches('ligue1')">🇫🇷 L1</button>
-            </div>
-
-            <div style="display:flex;gap:8px;margin-bottom:12px">
-              <button class="btn btn-primary btn-sm" onclick="adminSimulateScores()">🎲 Simuler 10 scores</button>
-              <button class="btn btn-gold btn-sm" onclick="adminSimulateAll()">🎲 Simuler TOUS les scores</button>
+          <!-- SCORES -->
+          <div class="admin-card" style="grid-column:1/-1">
+            <h4>⚽ Scores des Matchs</h4>
+            <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+              <button class="btn btn-primary btn-sm" onclick="adminSimulateScores()">🎲 Simuler 10</button>
+              <button class="btn btn-gold btn-sm" onclick="adminSimulateAll()">🎲 Simuler TOUT</button>
               <button class="btn btn-secondary btn-sm" onclick="adminResetScores()">🗑️ Réinitialiser</button>
             </div>
-
-            <div id="adminMatchList" style="max-height:500px;overflow-y:auto"></div>
+            <div id="adminMatchList" style="max-height:400px;overflow-y:auto"></div>
           </div>
 
-          <!-- THÈME -->
+          <!-- APPARENCE & THÈME -->
           <div class="admin-card">
             <h4>🎨 Thème & Couleurs</h4>
+            <p style="font-size:0.8rem;color:var(--text-muted)">Couleur principale du site :</p>
             <div class="theme-colors">
               <div class="theme-dot active" style="background:#e94560" onclick="changeTheme('#e94560')"></div>
               <div class="theme-dot" style="background:#00b894" onclick="changeTheme('#00b894')"></div>
               <div class="theme-dot" style="background:#6c5ce7" onclick="changeTheme('#6c5ce7')"></div>
               <div class="theme-dot" style="background:#f5c518" onclick="changeTheme('#f5c518')"></div>
               <div class="theme-dot" style="background:#0984e3" onclick="changeTheme('#0984e3')"></div>
+              <div class="theme-dot" style="background:#e17055" onclick="changeTheme('#e17055')"></div>
+              <div class="theme-dot" style="background:#00cec9" onclick="changeTheme('#00cec9')"></div>
             </div>
+          </div>
+
+          <!-- IMAGE DE FOND GLOBALE -->
+          <div class="admin-card">
+            <h4>🖼️ Image de Fond du Site</h4>
+            <p style="font-size:0.8rem;color:var(--text-muted)">Collez l'URL d'une image (ou laissez vide pour aucun fond) :</p>
+            <div class="form-group">
+              <input type="text" id="adminBgImage" placeholder="https://exemple.com/image.jpg" oninput="previewBgImage()">
+            </div>
+            <img id="bgPreview" class="img-preview" style="display:none">
+            <button class="btn btn-primary btn-sm" style="width:100%;margin-top:8px" onclick="adminSaveBgImage()">Appliquer le fond</button>
+            <button class="btn btn-secondary btn-xs" style="width:100%;margin-top:6px" onclick="adminRemoveBgImage()">Supprimer le fond</button>
+          </div>
+
+          <!-- IMAGES PAR CHAMPIONNAT -->
+          <div class="admin-card" style="grid-column:1/-1">
+            <h4>🏟️ Bannières par Championnat</h4>
+            <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">Collez une URL d'image pour chaque championnat (bannière en haut des matchs) :</p>
+            <div id="adminLeagueBanners"></div>
+            <button class="btn btn-gold btn-sm" style="width:100%;margin-top:12px" onclick="adminSaveLeagueBanners()">💾 Sauvegarder les bannières</button>
           </div>
 
           <!-- ANNONCE -->
           <div class="admin-card">
             <h4>📢 Annonce</h4>
-            <div class="form-group">
-              <input type="text" id="adminAnnounceInput" placeholder="Ex: Journée 1 terminée !">
-            </div>
+            <div class="form-group"><input type="text" id="adminAnnounceInput" placeholder="Ex: Journée 1 terminée !"></div>
             <button class="btn btn-gold btn-sm" style="width:100%" onclick="adminPublishAnnouncement()">Publier</button>
+          </div>
+
+          <!-- RÈGLES PERSONNALISÉES -->
+          <div class="admin-card">
+            <h4>📜 Modifier les Règles</h4>
+            <div class="form-group"><textarea id="adminRulesInput" placeholder="Ajoutez des règles supplémentaires..."></textarea></div>
+            <button class="btn btn-primary btn-sm" style="width:100%" onclick="adminSaveRules()">Sauvegarder</button>
           </div>
 
           <!-- STATS -->
           <div class="admin-card">
-            <h4>📊 Statistiques en direct</h4>
+            <h4>📊 Statistiques</h4>
             <div id="adminStats"></div>
           </div>
 
         </div>
       </div>
 
+    </div>
+
+    <!-- FOOTER -->
+    <div class="site-footer">
+      <p>⚽ PronoFoot © 2025 — Compétition amicale de pronostics</p>
+      <p style="margin-top:5px">
+        <a onclick="navigateTo('rules')">📜 Règles du jeu</a> ·
+        <a onclick="navigateTo('legal')">🔒 Confidentialité & CGU</a>
+      </p>
     </div>
   </div>
 
