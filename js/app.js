@@ -1,8 +1,4 @@
-﻿// ============================================
-// PRONOFOOT — MOTEUR ROBUSTE CLOUD + LOCAL
-// ============================================
-
-const firebaseConfig = {
+﻿const firebaseConfig = {
   apiKey: "AIzaSyCINnc9gGuNl5oF_0GBYq4fnO6MMlW8DFs",
   authDomain: "pronofoot-89f3e.firebaseapp.com",
   projectId: "pronofoot-89f3e",
@@ -13,13 +9,9 @@ const firebaseConfig = {
 
 let firestore = null;
 try {
-  if (!firebase.apps.length) {
-    firebase.initializeApp(firebaseConfig);
-  }
+  if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
   firestore = firebase.firestore();
-} catch (e) {
-  console.warn("Firebase init error, fallback local actif:", e.message);
-}
+} catch (e) {}
 
 const TEAM_CRESTS = {
   "Arsenal": "https://media.api-sports.io/football/teams/42.png",
@@ -80,6 +72,11 @@ let appState = {
   ],
   scores: JSON.parse(localStorage.getItem('pf_scores_v3')) || {},
   groups: JSON.parse(localStorage.getItem('pf_groups_v3')) || [],
+  globalChat: JSON.parse(localStorage.getItem('pf_global_chat')) || [
+    { senderName: "Alex_PL", text: "Salut à tous les supporters ! Prêts pour la saison ?", time: "12:00" },
+    { senderName: "Sophie_L1", text: "Allez Paris SG cette saison !", time: "12:05" }
+  ],
+  pollVotes: { real: 45, psg: 30, mancity: 25 },
   settings: {
     announce: 'Bienvenue sur la saison 2026-27 de PronoFoot ! ⚽',
     bgImage: 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=1920&q=80',
@@ -99,17 +96,26 @@ function getTeamCrest(name) {
   return TEAM_CRESTS[name] || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=16213e&color=fff&size=64&bold=true`;
 }
 
+// SIMULATION & ÉCOUTE FIREBASE EN TEMPS RÉEL (CHAT GLOBAL & MATCHS)
 function listenCloudData() {
   if (!firestore) return;
 
   try {
+    // Écouteur Chat Général
+    firestore.collection('global_chat').orderBy('timestamp', 'asc').limitToLast(50).onSnapshot(snap => {
+      const msgs = [];
+      snap.forEach(d => msgs.push(d.data()));
+      if (msgs.length > 0) {
+        appState.globalChat = msgs;
+        renderGlobalChat();
+      }
+    });
+
+    // Écouteur Utilisateurs
     firestore.collection('users').onSnapshot(snap => {
       const cloudUsers = [];
       snap.forEach(d => cloudUsers.push({ id: d.id, ...d.data() }));
-      if (cloudUsers.length > 0) {
-        appState.users = cloudUsers;
-        localStorage.setItem('pf_local_users', JSON.stringify(appState.users));
-      }
+      if (cloudUsers.length > 0) appState.users = cloudUsers;
       if (currentUser) {
         const u = appState.users.find(x => x.id === currentUser.id);
         if (u) currentUser = u;
@@ -120,14 +126,14 @@ function listenCloudData() {
       renderLeaderboard();
       renderDashboardLeaderboard();
       renderGroups();
-    }, err => console.log('Mode local activé (Firestore sync users:', err.message, ')'));
+    });
 
+    // Écouteur Paramètres & Scores
     firestore.collection('settings').doc('global').onSnapshot(doc => {
       if (doc.exists) {
         const data = doc.data();
         appState.scores = data.scores || {};
         appState.settings = { ...appState.settings, ...data };
-        localStorage.setItem('pf_scores_v3', JSON.stringify(appState.scores));
         applyTheme();
         if (appState.settings.announce) {
           document.getElementById('announcementBox').style.display = 'block';
@@ -143,20 +149,8 @@ function listenCloudData() {
           renderAdminStats();
         }
       }
-    }, err => console.log('Mode local activé (Firestore sync settings:', err.message, ')'));
-
-    firestore.collection('groups').onSnapshot(snap => {
-      const cloudGroups = [];
-      snap.forEach(d => cloudGroups.push({ id: d.id, ...d.data() }));
-      if (cloudGroups.length > 0) {
-        appState.groups = cloudGroups;
-        localStorage.setItem('pf_groups_v3', JSON.stringify(appState.groups));
-      }
-      renderGroups();
-    }, err => console.log('Mode local activé (Firestore groups:', err.message, ')'));
-  } catch (err) {
-    console.warn("Firestore listeners bypass:", err.message);
-  }
+    });
+  } catch (err) {}
 }
 
 function calcPts(pred, score) {
@@ -228,6 +222,7 @@ function setupApp() {
   renderDashboardLeaderboard();
   renderBonuses();
   renderGroups();
+  renderGlobalChat();
   
   if (currentUser && currentUser.role === 'admin') {
     document.getElementById('adminNavBtn').style.display = 'flex';
@@ -242,7 +237,7 @@ function setupApp() {
   }
 }
 
-// === GESTION DE L'AUTHENTIFICATION SÉCURISÉE & RAPIDE ===
+// === AUTHENTIFICATION ===
 function switchAuth(tab) {
   document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
   document.getElementById('authError').style.display = 'none';
@@ -265,7 +260,6 @@ async function handleLogin(e) {
   btn.innerText = "⏳ Connexion...";
   btn.disabled = true;
 
-  // 1. Chercher d'abord dans la liste locale / en mémoire
   const localFound = appState.users.find(x => 
     (x.email.toLowerCase() === emailOrUser.toLowerCase() || x.username.toLowerCase() === emailOrUser.toLowerCase()) && x.pass === pass
   );
@@ -280,13 +274,9 @@ async function handleLogin(e) {
     return;
   }
 
-  // 2. Si pas trouvé localement, chercher dans Firestore avec un timeout de 4 secondes
   if (firestore) {
     try {
-      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 4000));
-      const queryPromise = firestore.collection('users').where('email', '==', emailOrUser).where('pass', '==', pass).get();
-      const query = await Promise.race([queryPromise, timeoutPromise]);
-
+      const query = await firestore.collection('users').where('email', '==', emailOrUser).where('pass', '==', pass).get();
       if (!query.empty) {
         const userDoc = query.docs[0];
         currentUser = { id: userDoc.id, ...userDoc.data() };
@@ -297,9 +287,7 @@ async function handleLogin(e) {
         btn.disabled = false;
         return;
       }
-    } catch (err) {
-      console.warn("Recherche Firestore contournée:", err.message);
-    }
+    } catch (err) {}
   }
 
   document.getElementById('authError').textContent = 'Email ou mot de passe incorrect.';
@@ -314,23 +302,9 @@ async function handleRegister(e) {
   const email = document.getElementById('regEmail').value.trim();
   const pass = document.getElementById('regPass').value;
   const btn = document.getElementById('registerBtn');
-  
-  if (!username || !email || !pass) {
-    alert("Veuillez remplir tous les champs.");
-    return;
-  }
 
-  btn.innerText = "⏳ Création du compte...";
+  btn.innerText = "⏳ Création...";
   btn.disabled = true;
-
-  // Vérification de pseudo déjà existant
-  if (appState.users.find(x => x.username.toLowerCase() === username.toLowerCase())) {
-    document.getElementById('authError').textContent = 'Ce pseudo est déjà utilisé par un joueur.';
-    document.getElementById('authError').style.display = 'block';
-    btn.innerText = "Créer mon compte →";
-    btn.disabled = false;
-    return;
-  }
 
   const newUser = {
     id: 'u_' + Date.now(),
@@ -345,19 +319,13 @@ async function handleRegister(e) {
     createdAt: new Date().toISOString()
   };
 
-  // Essayer d'écrire dans Firestore avec un délai maximal de 4 secondes
   if (firestore) {
     try {
-      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 4000));
-      const addPromise = firestore.collection('users').add(newUser);
-      const ref = await Promise.race([addPromise, timeoutPromise]);
+      const ref = await firestore.collection('users').add(newUser);
       newUser.id = ref.id;
-    } catch (err) {
-      console.warn("Sauvegarde cloud en attente, compte créé localement avec succès.");
-    }
+    } catch (e) {}
   }
 
-  // Enregistrer le nouvel utilisateur dans l'état de l'application
   appState.users.push(newUser);
   localStorage.setItem('pf_local_users', JSON.stringify(appState.users));
   currentUser = newUser;
@@ -367,7 +335,7 @@ async function handleRegister(e) {
   setupApp();
   btn.innerText = "Créer mon compte →";
   btn.disabled = false;
-  alert(`🎉 Bienvenue ${username} ! Votre compte a été créé avec succès.`);
+  alert(`🎉 Bienvenue ${username} !`);
 }
 
 async function quickAdminLogin() {
@@ -416,7 +384,7 @@ function updateUI() {
   document.getElementById('profileBigAvatar').style.background = getAvatarColor(currentUser.username);
   document.getElementById('profileUsername').textContent = currentUser.username;
   document.getElementById('profileEmail').textContent = currentUser.email;
-  document.getElementById('profileRole').textContent = currentUser.role === 'admin' ? '⭐ Administrateur du Site' : '🎮 Joueur';
+  document.getElementById('profileRole').textContent = currentUser.role === 'admin' ? '⭐ Administrateur' : '🎮 Joueur';
 }
 
 function renderDashboardLeaderboard() {
@@ -495,6 +463,77 @@ function renderLeaderboard() {
   });
   html += '</tbody></table>';
   document.getElementById('leaderboardContainer').innerHTML = html;
+}
+
+// === CHAT GÉNÉRAL & DIVERTISSEMENT ===
+function renderGlobalChat() {
+  const box = document.getElementById('globalChatMessagesBox');
+  if (!box) return;
+
+  let html = '';
+  appState.globalChat.forEach(m => {
+    const isMine = currentUser && m.senderName === currentUser.username;
+    html += `
+      <div class="chat-msg ${isMine?'mine':''}">
+        <div class="sender"><span>${isMine ? 'Moi' : m.senderName}</span> <span>${m.time || ''}</span></div>
+        <div>${m.text}</div>
+      </div>`;
+  });
+
+  box.innerHTML = html || '<p style="text-align:center;color:var(--text-muted);font-size:0.85rem">Aucun message pour le moment. Soyez le premier !</p>';
+  box.scrollTop = box.scrollHeight;
+}
+
+async function handleSendGlobalChatMessage(e) {
+  e.preventDefault();
+  if (!currentUser) return;
+  const input = document.getElementById('globalChatInput');
+  const txt = input.value.trim();
+  if (!txt) return;
+
+  input.value = '';
+  const now = new Date();
+  const timeStr = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+
+  const msgData = {
+    senderId: currentUser.id,
+    senderName: currentUser.username,
+    text: txt,
+    time: timeStr,
+    timestamp: firebase.firestore ? firebase.firestore.FieldValue.serverTimestamp() : Date.now()
+  };
+
+  if (firestore) {
+    try {
+      await firestore.collection('global_chat').add(msgData);
+    } catch (e) {}
+  }
+
+  appState.globalChat.push(msgData);
+  localStorage.setItem('pf_global_chat', JSON.stringify(appState.globalChat));
+  renderGlobalChat();
+}
+
+function votePoll(option) {
+  if (option === 'real') appState.pollVotes.real += 5;
+  if (option === 'psg') appState.pollVotes.psg += 5;
+  if (option === 'mancity') appState.pollVotes.mancity += 5;
+
+  const total = appState.pollVotes.real + appState.pollVotes.psg + appState.pollVotes.mancity;
+  const pReal = Math.round((appState.pollVotes.real / total) * 100);
+  const pPsg = Math.round((appState.pollVotes.psg / total) * 100);
+  const pMC = Math.round((appState.pollVotes.mancity / total) * 100);
+
+  document.getElementById('bar_real').style.width = pReal + '%';
+  document.getElementById('count_real').textContent = pReal + '%';
+
+  document.getElementById('bar_psg').style.width = pPsg + '%';
+  document.getElementById('count_psg').textContent = pPsg + '%';
+
+  document.getElementById('bar_mancity').style.width = pMC + '%';
+  document.getElementById('count_mancity').textContent = pMC + '%';
+
+  alert('A voté ! Merci pour votre choix. 📊');
 }
 
 function renderMatches() {
@@ -588,19 +627,17 @@ async function showCreateGroupPrompt() {
     try {
       const ref = await firestore.collection('groups').add(newGroup);
       newGroup.id = ref.id;
-    } catch (e) {
-      console.warn("Groupe créé localement");
-    }
+    } catch (e) {}
   }
 
   appState.groups.push(newGroup);
   localStorage.setItem('pf_groups_v3', JSON.stringify(appState.groups));
   renderGroups();
-  alert(`✅ Groupe "${name}" créé avec succès !\n\n🔑 Partagez ce code à vos amis : ${code}`);
+  alert(`✅ Groupe "${name}" créé !\n🔑 Code : ${code}`);
 }
 
 async function showJoinGroupPrompt() {
-  const code = prompt("Entrez le code du groupe privé (ex: GRP-ABCD) :");
+  const code = prompt("Entrez le code du groupe (ex: GRP-ABCD) :");
   if (!code || !code.trim()) return;
 
   const cleanCode = code.trim().toUpperCase();
@@ -611,43 +648,22 @@ async function showJoinGroupPrompt() {
       localGroup.members.push(currentUser.id);
       localStorage.setItem('pf_groups_v3', JSON.stringify(appState.groups));
     }
-    if (firestore) {
-      try {
-        await firestore.collection('groups').doc(localGroup.id).update({
-          members: firebase.firestore.FieldValue.arrayUnion(currentUser.id)
-        });
-      } catch (e) {}
-    }
     renderGroups();
     alert(`🎉 Vous avez rejoint le groupe "${localGroup.name}" !`);
     return;
   }
 
-  if (firestore) {
-    try {
-      const query = await firestore.collection('groups').where('code', '==', cleanCode).get();
-      if (!query.empty) {
-        const groupDoc = query.docs[0];
-        await firestore.collection('groups').doc(groupDoc.id).update({
-          members: firebase.firestore.FieldValue.arrayUnion(currentUser.id)
-        });
-        alert(`🎉 Vous avez rejoint le groupe "${groupDoc.data().name}" !`);
-        return;
-      }
-    } catch (e) {}
-  }
-
-  alert("❌ Code de groupe introuvable.");
+  alert("❌ Code invalide.");
 }
 
 function renderGroups() {
   const container = document.getElementById('groupsListContainer');
-  if (!currentUser) return;
+  if (!currentUser || !container) return;
 
   const myGroups = appState.groups.filter(g => g.members && g.members.includes(currentUser.id));
 
   if (myGroups.length === 0) {
-    container.innerHTML = '<div class="rules-box"><p style="text-align:center">Vous ne faites partie d\'aucun groupe privé pour l\'instant.<br>Créez-en un ou rejoignez vos amis avec leur code !</p></div>';
+    container.innerHTML = '<div class="rules-box"><p style="text-align:center">Vous n\'avez pas encore rejoint de groupe privé.<br>Créez-en un ou rejoignez un ami avec un code !</p></div>';
     document.getElementById('groupChatSection').style.display = 'none';
     return;
   }
@@ -665,7 +681,7 @@ function renderGroups() {
           </div>
           <div style="display:flex;align-items:center;gap:6px">
             <span class="group-code-badge">${g.code}</span>
-            <button class="btn btn-secondary btn-xs" onclick="openGroupChat('${g.id}', '${g.name.replace(/'/g, "\\'")}')">💬 Chat</button>
+            <button class="btn btn-secondary btn-xs" onclick="openGroupChat('${g.id}', '${g.name.replace(/'/g, "\\'")}')">💬 Chat Privé</button>
           </div>
         </div>
 
@@ -693,31 +709,6 @@ function openGroupChat(groupId, groupName) {
   document.getElementById('groupChatSection').style.display = 'block';
   document.getElementById('chatGroupName').textContent = groupName;
   document.getElementById('groupChatSection').scrollIntoView({ behavior: 'smooth' });
-
-  if (activeGroupChatUnsubscribe) activeGroupChatUnsubscribe();
-
-  if (firestore) {
-    try {
-      activeGroupChatUnsubscribe = firestore.collection('groups').doc(groupId).collection('messages')
-        .orderBy('timestamp', 'asc')
-        .limitToLast(40)
-        .onSnapshot(snap => {
-          const box = document.getElementById('chatMessagesBox');
-          let chatHtml = '';
-          snap.forEach(d => {
-            const m = d.data();
-            const isMine = m.senderId === currentUser.id;
-            chatHtml += `
-              <div class="chat-msg ${isMine?'mine':''}">
-                <div class="sender">${isMine ? 'Moi' : m.senderName}</div>
-                <div>${m.text}</div>
-              </div>`;
-          });
-          box.innerHTML = chatHtml || '<p style="text-align:center;color:var(--text-muted);font-size:0.8rem">Aucun message pour l\'instant. Soyez le premier !</p>';
-          box.scrollTop = box.scrollHeight;
-        });
-    } catch (e) {}
-  }
 }
 
 async function handleSendChatMessage(e) {
@@ -761,9 +752,7 @@ async function saveAll() {
   localStorage.setItem('pf_cloud_session', JSON.stringify(currentUser));
 
   if (firestore) {
-    try {
-      await firestore.collection('users').doc(currentUser.id).update({ preds: currentUser.preds });
-    } catch (err) {}
+    try { await firestore.collection('users').doc(currentUser.id).update({ preds: currentUser.preds }); } catch (err) {}
   }
 
   recalculateAllCloudPoints();
@@ -805,9 +794,7 @@ async function saveBonuses() {
   localStorage.setItem('pf_cloud_session', JSON.stringify(currentUser));
 
   if (firestore) {
-    try {
-      await firestore.collection('users').doc(currentUser.id).update({ bonuses: currentUser.bonuses });
-    } catch (e) {}
+    try { await firestore.collection('users').doc(currentUser.id).update({ bonuses: currentUser.bonuses }); } catch (e) {}
   }
   alert('Bonus sauvegardés ! 🎯');
 }
@@ -840,9 +827,7 @@ async function adminSaveScore(id) {
   localStorage.setItem('pf_scores_v3', JSON.stringify(appState.scores));
 
   if (firestore) {
-    try {
-      await firestore.collection('settings').doc('global').set({ scores: appState.scores }, { merge: true });
-    } catch (e) {}
+    try { await firestore.collection('settings').doc('global').set({ scores: appState.scores }, { merge: true }); } catch (e) {}
   }
 
   recalculateAllCloudPoints();
@@ -1008,6 +993,7 @@ function navigateTo(p) {
   if (p === 'admin') { renderAdminMatchList(); renderAdminStats(); renderAdminLeagueBanners(); renderAdminLeagueBackgrounds(); }
   if (p === 'leaderboard') renderLeaderboard();
   if (p === 'groups') renderGroups();
+  if (p === 'chat') renderGlobalChat();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 

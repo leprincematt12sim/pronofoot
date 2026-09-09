@@ -99,17 +99,16 @@ h1, h2, h3, h4 { letter-spacing: -0.02em; font-weight: 800; }
 .stat-card .val { font-size: 1.8rem; font-weight: 800; color: var(--accent); }
 .stat-card .lbl { font-size: 0.8rem; color: var(--text-muted); margin-top: 4px; }
 
-/* LEAGUE TABS */
+/* LEAGUE TABS & MONTH BAR */
 .league-tabs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 15px; }
 .league-tab { padding: 9px 16px; border-radius: 20px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-muted); cursor: pointer; white-space: nowrap; font-size: 0.85rem; font-weight: bold; transition: 0.2s; }
 .league-tab.active { background: var(--accent); color: white; border-color: var(--accent); }
 
-/* SÉLECTEUR DE JOURNÉES */
 .matchday-bar { display: flex; gap: 6px; overflow-x: auto; padding: 6px 0 14px; margin-bottom: 12px; }
 .matchday-pill { padding: 6px 12px; border-radius: 6px; background: var(--bg-dark); border: 1px solid var(--border); color: var(--text-muted); font-size: 0.8rem; font-weight: bold; cursor: pointer; white-space: nowrap; }
 .matchday-pill.active { background: var(--gold); color: #0a0a1a; border-color: var(--gold); }
 
-/* MATCH CARDS AVEC LOGOS */
+/* MATCH CARDS */
 .match-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; margin-bottom: 12px; transition: all 0.2s ease; backdrop-filter: blur(5px); }
 .match-card:hover { border-color: var(--accent); transform: translateY(-2px); }
 .match-card.finished { border-left: 5px solid var(--green); }
@@ -125,15 +124,25 @@ h1, h2, h3, h4 { letter-spacing: -0.02em; font-weight: 800; }
 .match-prediction input:focus { border-color: var(--accent); box-shadow: 0 0 10px var(--accent); }
 .match-result-badge { text-align: center; margin-top: 10px; font-size: 0.85rem; font-weight: bold; padding: 6px; border-radius: 6px; background: rgba(0,0,0,0.3); }
 
-/* GROUPES PRIVÉS */
-.group-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; margin-bottom: 12px; }
-.group-code-badge { background: rgba(245, 197, 24, 0.15); color: var(--gold); border: 1px dashed var(--gold); padding: 6px 12px; border-radius: 6px; font-family: monospace; font-size: 1rem; font-weight: bold; letter-spacing: 2px; }
+/* CHAT GÉNÉRAL & DIVERTISSEMENT */
+.chat-container { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; margin-bottom: 20px; }
+.chat-box { background: var(--bg-dark); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px; height: 320px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+.chat-msg { background: var(--bg-card); border: 1px solid var(--border); padding: 10px 14px; border-radius: 10px; font-size: 0.88rem; max-width: 80%; align-self: flex-start; }
+.chat-msg.mine { align-self: flex-end; background: var(--accent); border-color: var(--accent); color: white; }
+.chat-msg .sender { font-size: 0.75rem; font-weight: 800; color: var(--gold); margin-bottom: 3px; display: flex; justify-content: space-between; gap: 10px; }
+.chat-msg.mine .sender { color: rgba(255,255,255,0.9); }
 
-/* CHAT WIDGET */
-.chat-box { background: var(--bg-dark); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; height: 280px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
-.chat-msg { background: var(--bg-card); padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; max-width: 85%; }
-.chat-msg.mine { align-self: flex-end; background: var(--accent); color: white; }
-.chat-msg .sender { font-size: 0.75rem; font-weight: bold; opacity: 0.8; margin-bottom: 2px; }
+/* SONDAGES (POLLS) */
+.poll-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; margin-bottom: 20px; }
+.poll-option { background: var(--bg-dark); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; margin-top: 8px; cursor: pointer; position: relative; overflow: hidden; transition: 0.2s; font-weight: bold; display: flex; justify-content: space-between; }
+.poll-option:hover { border-color: var(--accent); }
+.poll-bar { position: absolute; left: 0; top: 0; bottom: 0; background: rgba(233, 69, 96, 0.25); border-radius: 8px; transition: width 0.5s ease; }
+
+/* BADGES & TROPHÉES */
+.badges-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-top: 12px; }
+.badge-item { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 12px; text-align: center; }
+.badge-icon { font-size: 2rem; margin-bottom: 4px; }
+.badge-title { font-size: 0.8rem; font-weight: bold; color: var(--gold); }
 
 /* TABLEAU & PODIUM */
 .leaderboard-table { width: 100%; border-collapse: separate; border-spacing: 0 6px; }
@@ -163,7 +172,6 @@ h1, h2, h3, h4 { letter-spacing: -0.02em; font-weight: 800; }
 
 .site-footer { text-align: center; padding: 25px; color: var(--text-dim); font-size: 0.8rem; border-top: 1px solid var(--border); margin-top: 40px; }
 .site-footer a { color: var(--text-muted); text-decoration: underline; cursor: pointer; }
-.site-footer a:hover { color: var(--accent); }
 
 @media (max-width: 768px) {
   .bottom-nav { display: flex; }
