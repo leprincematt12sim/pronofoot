@@ -65,10 +65,10 @@ function generateDemoPredictions() {
 
 let appState = {
   users: JSON.parse(localStorage.getItem('pf_local_users')) || [
-    { id:'admin', username:'Admin', email:'admin@pronofoot.com', pass:'admin123', role:'admin', points:0, preds:{}, bonuses:{}, groups:[] },
-    { id:'u1', username:'Alex_PL', email:'alex@test.com', pass:'123456', role:'user', points:45, preds:generateDemoPredictions(), bonuses:{}, groups:[] },
-    { id:'u2', username:'Sophie_L1', email:'sophie@test.com', pass:'123456', role:'user', points:38, preds:generateDemoPredictions(), bonuses:{}, groups:[] },
-    { id:'u3', username:'Marco_SerieA', email:'marco@test.com', pass:'123456', role:'user', points:31, preds:generateDemoPredictions(), bonuses:{}, groups:[] }
+    { id:'admin', username:'Admin', email:'admin@pronofoot.com', pass:'admin123', role:'admin', points:0, preds:{}, bonuses:{}, groups:[], avatar:null },
+    { id:'u1', username:'Alex_PL', email:'alex@test.com', pass:'123456', role:'user', points:45, preds:generateDemoPredictions(), bonuses:{}, groups:[], avatar:null },
+    { id:'u2', username:'Sophie_L1', email:'sophie@test.com', pass:'123456', role:'user', points:38, preds:generateDemoPredictions(), bonuses:{}, groups:[], avatar:null },
+    { id:'u3', username:'Marco_SerieA', email:'marco@test.com', pass:'123456', role:'user', points:31, preds:generateDemoPredictions(), bonuses:{}, groups:[], avatar:null }
   ],
   scores: JSON.parse(localStorage.getItem('pf_scores_v3')) || {},
   groups: JSON.parse(localStorage.getItem('pf_groups_v3')) || [],
@@ -96,12 +96,63 @@ function getTeamCrest(name) {
   return TEAM_CRESTS[name] || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=16213e&color=fff&size=64&bold=true`;
 }
 
-// SIMULATION & ÉCOUTE FIREBASE EN TEMPS RÉEL (CHAT GLOBAL & MATCHS)
+// Fonction de compression d'image globale
+function compressAndReadFile(file, maxWidth, callback) {
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const img = new Image();
+    img.onload = function() {
+      const canvas = document.createElement('canvas');
+      let width = img.width;
+      let height = img.height;
+      if (width > maxWidth) {
+        height = Math.round((height * maxWidth) / width);
+        width = maxWidth;
+      }
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+      callback(dataUrl);
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// TÉLÉCHARGER PHOTO DE PROFIL
+async function uploadUserAvatar(event) {
+  const file = event.target.files[0];
+  if (!file || !currentUser) return;
+
+  compressAndReadFile(file, 200, async function(dataUrl) {
+    currentUser.avatar = dataUrl;
+    
+    // Mettre à jour l'état local
+    const idx = appState.users.findIndex(u => u.id === currentUser.id);
+    if (idx !== -1) appState.users[idx].avatar = dataUrl;
+    localStorage.setItem('pf_local_users', JSON.stringify(appState.users));
+    localStorage.setItem('pf_cloud_session', JSON.stringify(currentUser));
+    
+    // Mettre à jour Firestore
+    if (firestore) {
+      try {
+        await firestore.collection('users').doc(currentUser.id).update({ avatar: dataUrl });
+      } catch (err) {}
+    }
+    
+    updateUI();
+    renderLeaderboard();
+    renderDashboardLeaderboard();
+    alert('📸 Photo de profil mise à jour avec succès !');
+  });
+}
+
 function listenCloudData() {
   if (!firestore) return;
 
   try {
-    // Écouteur Chat Général
     firestore.collection('global_chat').orderBy('timestamp', 'asc').limitToLast(50).onSnapshot(snap => {
       const msgs = [];
       snap.forEach(d => msgs.push(d.data()));
@@ -111,7 +162,6 @@ function listenCloudData() {
       }
     });
 
-    // Écouteur Utilisateurs
     firestore.collection('users').onSnapshot(snap => {
       const cloudUsers = [];
       snap.forEach(d => cloudUsers.push({ id: d.id, ...d.data() }));
@@ -128,7 +178,6 @@ function listenCloudData() {
       renderGroups();
     });
 
-    // Écouteur Paramètres & Scores
     firestore.collection('settings').doc('global').onSnapshot(doc => {
       if (doc.exists) {
         const data = doc.data();
@@ -229,15 +278,12 @@ function setupApp() {
     document.getElementById('topAdminBtn').style.display = 'block';
     renderAdminMatchList();
     renderAdminStats();
-    renderAdminLeagueBackgrounds();
-    renderAdminLeagueBanners();
   } else {
     document.getElementById('adminNavBtn').style.display = 'none';
     document.getElementById('topAdminBtn').style.display = 'none';
   }
 }
 
-// === AUTHENTIFICATION ===
 function switchAuth(tab) {
   document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
   document.getElementById('authError').style.display = 'none';
@@ -316,6 +362,7 @@ async function handleRegister(e) {
     preds: {},
     bonuses: {},
     groups: [],
+    avatar: null,
     createdAt: new Date().toISOString()
   };
 
@@ -348,7 +395,8 @@ async function quickAdminLogin() {
     points: 0,
     preds: {},
     bonuses: {},
-    groups: []
+    groups: [],
+    avatar: null
   };
 
   currentUser = adminUser;
@@ -364,11 +412,34 @@ function handleLogout() {
   location.reload();
 }
 
+function getAvatarHtml(u, sizePx = 32, fontSize = 0.8) {
+  if (u.avatar) {
+    return `<div style="width:${sizePx}px;height:${sizePx}px;border-radius:50%;background-image:url('${u.avatar}');background-size:cover;background-position:center;border:1px solid var(--border);flex-shrink:0"></div>`;
+  }
+  const color = getAvatarColor(u.username);
+  return `<div style="width:${sizePx}px;height:${sizePx}px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:${fontSize}rem;flex-shrink:0;color:white;border:1px solid var(--border)">${(u.username||'A')[0].toUpperCase()}</div>`;
+}
+
 function updateUI() {
   if (!currentUser) return;
   document.getElementById('navPoints').textContent = '⭐ ' + currentUser.points + ' pts';
-  document.getElementById('navAvatar').textContent = (currentUser.username || 'A')[0].toUpperCase();
-  document.getElementById('navAvatar').style.background = getAvatarColor(currentUser.username);
+  
+  if (currentUser.avatar) {
+    document.getElementById('navAvatar').innerHTML = '';
+    document.getElementById('navAvatar').style.backgroundImage = `url('${currentUser.avatar}')`;
+    document.getElementById('navAvatar').style.backgroundSize = 'cover';
+    
+    document.getElementById('profileBigAvatar').innerHTML = '';
+    document.getElementById('profileBigAvatar').style.backgroundImage = `url('${currentUser.avatar}')`;
+    document.getElementById('profileBigAvatar').style.backgroundSize = 'cover';
+  } else {
+    document.getElementById('navAvatar').textContent = (currentUser.username || 'A')[0].toUpperCase();
+    document.getElementById('navAvatar').style.background = getAvatarColor(currentUser.username);
+    
+    document.getElementById('profileBigAvatar').textContent = (currentUser.username || 'A')[0].toUpperCase();
+    document.getElementById('profileBigAvatar').style.background = getAvatarColor(currentUser.username);
+  }
+
   document.getElementById('welcomeMsg').textContent = 'Bienvenue, ' + currentUser.username + ' ! 👋';
 
   const st = getUserStats(currentUser);
@@ -380,8 +451,6 @@ function updateUI() {
   const rank = sorted.findIndex(u => u.id === currentUser.id);
   document.getElementById('statRank').textContent = rank >= 0 ? '#' + (rank+1) : '-';
 
-  document.getElementById('profileBigAvatar').textContent = (currentUser.username || 'A')[0].toUpperCase();
-  document.getElementById('profileBigAvatar').style.background = getAvatarColor(currentUser.username);
   document.getElementById('profileUsername').textContent = currentUser.username;
   document.getElementById('profileEmail').textContent = currentUser.email;
   document.getElementById('profileRole').textContent = currentUser.role === 'admin' ? '⭐ Administrateur' : '🎮 Joueur';
@@ -394,17 +463,17 @@ function renderDashboardLeaderboard() {
 
   sorted.slice(0, 5).forEach((u, i) => {
     const isMe = currentUser && u.id === currentUser.id;
-    const color = getAvatarColor(u.username);
     const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':'';
     const pct = max > 0 ? Math.round((u.points / max) * 100) : 0;
+    const avatarHtml = getAvatarHtml(u, 36, 1);
 
     html += `
       <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:${isMe?'rgba(233,69,96,0.15)':'var(--bg-card)'};border:1px solid ${isMe?'var(--accent)':'var(--border)'};border-radius:8px;margin-bottom:6px">
         <span style="font-weight:800;min-width:30px;color:${i<3?'var(--gold)':'var(--text-muted)'}">${medal||'#'+(i+1)}</span>
-        <div style="width:32px;height:32px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:0.8rem">${(u.username||'A')[0].toUpperCase()}</div>
+        ${avatarHtml}
         <div style="flex:1">
           <div style="font-weight:700;font-size:0.9rem">${u.username} ${u.role==='admin'?'⭐':''}</div>
-          <div style="height:4px;background:var(--bg-dark);border-radius:2px;margin-top:4px"><div style="height:100%;width:${pct}%;background:${color};border-radius:2px"></div></div>
+          <div style="height:4px;background:var(--bg-dark);border-radius:2px;margin-top:4px"><div style="height:100%;width:${pct}%;background:var(--accent);border-radius:2px"></div></div>
         </div>
         <span style="font-weight:800;color:var(--gold);min-width:55px;text-align:right">${u.points} pts</span>
       </div>`;
@@ -425,11 +494,11 @@ function renderLeaderboard() {
     pod = '<div style="display:flex;justify-content:center;align-items:flex-end;gap:10px;margin-bottom:20px">';
     p.forEach((u, i) => {
       if (!u) return;
-      const c = getAvatarColor(u.username);
+      const avatarHtml = getAvatarHtml(u, 45, 1.2);
       pod += `
         <div style="text-align:center;flex:1;max-width:120px">
           <div style="font-size:1.5rem">${m[i]}</div>
-          <div style="width:45px;height:45px;border-radius:50%;background:${c};display:flex;align-items:center;justify-content:center;font-weight:bold;margin:5px auto;border:3px solid ${bg[i]}">${(u.username||'A')[0].toUpperCase()}</div>
+          <div style="margin:5px auto;display:flex;justify-content:center">${avatarHtml}</div>
           <div style="font-weight:700;font-size:0.85rem">${u.username}</div>
           <div style="font-weight:800;color:var(--gold)">${u.points} pts</div>
           <div style="height:${h[i]}px;background:linear-gradient(to top,${bg[i]},transparent);border-radius:8px 8px 0 0;margin-top:8px;opacity:0.35"></div>
@@ -442,16 +511,16 @@ function renderLeaderboard() {
   let html = '<table class="leaderboard-table"><thead><tr><th>#</th><th>Joueur</th><th>Pronos</th><th>✅ Exact</th><th>🎯 Bon</th><th>Points</th></tr></thead><tbody>';
   sorted.forEach((u, i) => {
     const isMe = currentUser && u.id === currentUser.id;
-    const c = getAvatarColor(u.username);
     const st = getUserStats(u);
     const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':'#'+(i+1);
+    const avatarHtml = getAvatarHtml(u, 30, 0.8);
 
     html += `
       <tr class="${isMe?'current-user':''}">
         <td>${medal}</td>
         <td>
           <div style="display:flex;align-items:center;gap:8px">
-            <div style="width:28px;height:28px;border-radius:50%;background:${c};display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:0.7rem">${(u.username||'A')[0].toUpperCase()}</div>
+            ${avatarHtml}
             ${u.username} ${u.role==='admin'?'⭐':''} ${isMe?'<span style="color:var(--accent);font-size:0.7rem">(toi)</span>':''}
           </div>
         </td>
@@ -465,7 +534,6 @@ function renderLeaderboard() {
   document.getElementById('leaderboardContainer').innerHTML = html;
 }
 
-// === CHAT GÉNÉRAL & DIVERTISSEMENT ===
 function renderGlobalChat() {
   const box = document.getElementById('globalChatMessagesBox');
   if (!box) return;
@@ -473,10 +541,19 @@ function renderGlobalChat() {
   let html = '';
   appState.globalChat.forEach(m => {
     const isMine = currentUser && m.senderName === currentUser.username;
+    
+    // Trouver l'utilisateur pour afficher sa photo (ou une couleur par défaut)
+    const senderUser = appState.users.find(u => u.username === m.senderName) || { username: m.senderName };
+    const avatarHtml = getAvatarHtml(senderUser, 24, 0.7);
+
     html += `
-      <div class="chat-msg ${isMine?'mine':''}">
-        <div class="sender"><span>${isMine ? 'Moi' : m.senderName}</span> <span>${m.time || ''}</span></div>
-        <div>${m.text}</div>
+      <div class="chat-msg ${isMine?'mine':''}" style="display:flex;gap:8px">
+        ${!isMine ? avatarHtml : ''}
+        <div style="flex:1">
+          <div class="sender"><span>${isMine ? 'Moi' : m.senderName}</span> <span>${m.time || ''}</span></div>
+          <div>${m.text}</div>
+        </div>
+        ${isMine ? avatarHtml : ''}
       </div>`;
   });
 
@@ -504,9 +581,7 @@ async function handleSendGlobalChatMessage(e) {
   };
 
   if (firestore) {
-    try {
-      await firestore.collection('global_chat').add(msgData);
-    } catch (e) {}
+    try { await firestore.collection('global_chat').add(msgData); } catch (e) {}
   }
 
   appState.globalChat.push(msgData);
@@ -526,14 +601,12 @@ function votePoll(option) {
 
   document.getElementById('bar_real').style.width = pReal + '%';
   document.getElementById('count_real').textContent = pReal + '%';
-
   document.getElementById('bar_psg').style.width = pPsg + '%';
   document.getElementById('count_psg').textContent = pPsg + '%';
-
   document.getElementById('bar_mancity').style.width = pMC + '%';
   document.getElementById('count_mancity').textContent = pMC + '%';
 
-  alert('A voté ! Merci pour votre choix. 📊');
+  alert('A voté ! 📊');
 }
 
 function renderMatches() {
@@ -608,6 +681,7 @@ function renderMatches() {
   container.innerHTML = html;
 }
 
+// === GROUPES PRIVÉS ===
 async function showCreateGroupPrompt() {
   const name = prompt("Nom de votre Groupe Privé (ex: Les Potes du Foot) :");
   if (!name || !name.trim()) return;
@@ -633,7 +707,14 @@ async function showCreateGroupPrompt() {
   appState.groups.push(newGroup);
   localStorage.setItem('pf_groups_v3', JSON.stringify(appState.groups));
   renderGroups();
-  alert(`✅ Groupe "${name}" créé !\n🔑 Code : ${code}`);
+  
+  // Outil d'invitation WhatsApp intégré
+  const inviteText = `Salut ! Rejoins mon groupe "${name}" sur PronoFoot pour la saison 2026-27 !\n\n1. Va sur le site\n2. Clique sur "Groupes" > "Rejoindre avec un Code"\n3. Tape ce code : ${code}`;
+  const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(inviteText)}`;
+  
+  if (confirm(`✅ Groupe "${name}" créé avec succès !\nCode d'invitation : ${code}\n\nVoulez-vous envoyer une invitation à vos amis sur WhatsApp ?`)) {
+    window.open(whatsappUrl, '_blank');
+  }
 }
 
 async function showJoinGroupPrompt() {
@@ -653,7 +734,27 @@ async function showJoinGroupPrompt() {
     return;
   }
 
-  alert("❌ Code invalide.");
+  if (firestore) {
+    try {
+      const query = await firestore.collection('groups').where('code', '==', cleanCode).get();
+      if (!query.empty) {
+        const groupDoc = query.docs[0];
+        await firestore.collection('groups').doc(groupDoc.id).update({
+          members: firebase.firestore.FieldValue.arrayUnion(currentUser.id)
+        });
+        alert(`🎉 Vous avez rejoint le groupe "${groupDoc.data().name}" !`);
+        return;
+      }
+    } catch (e) {}
+  }
+
+  alert("❌ Code de groupe introuvable.");
+}
+
+// Fonction de partage WhatsApp direct
+function shareGroupWhatsApp(code, name) {
+  const inviteText = `Salut ! Rejoins ma ligue "${name}" sur PronoFoot pour la saison 2026-27 !\n\n1. Va sur le site\n2. Va dans l'onglet "Groupes" > "Rejoindre avec un Code"\n3. Entre mon code secret : ${code}`;
+  window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(inviteText)}`, '_blank');
 }
 
 function renderGroups() {
@@ -663,7 +764,7 @@ function renderGroups() {
   const myGroups = appState.groups.filter(g => g.members && g.members.includes(currentUser.id));
 
   if (myGroups.length === 0) {
-    container.innerHTML = '<div class="rules-box"><p style="text-align:center">Vous n\'avez pas encore rejoint de groupe privé.<br>Créez-en un ou rejoignez un ami avec un code !</p></div>';
+    container.innerHTML = '<div class="rules-box"><p style="text-align:center">Vous ne faites partie d\'aucun groupe privé pour l\'instant.<br>Créez-en un ou rejoignez vos amis avec leur code !</p></div>';
     document.getElementById('groupChatSection').style.display = 'none';
     return;
   }
@@ -681,6 +782,7 @@ function renderGroups() {
           </div>
           <div style="display:flex;align-items:center;gap:6px">
             <span class="group-code-badge">${g.code}</span>
+            <button class="btn btn-green btn-xs" style="background:#25D366;color:white;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;font-weight:bold" onclick="shareGroupWhatsApp('${g.code}', '${g.name.replace(/'/g, "\\'")}')">💬 Inviter sur WhatsApp</button>
             <button class="btn btn-secondary btn-xs" onclick="openGroupChat('${g.id}', '${g.name.replace(/'/g, "\\'")}')">💬 Chat Privé</button>
           </div>
         </div>
@@ -691,7 +793,12 @@ function renderGroups() {
             ${groupUsers.map((u, i) => `
               <tr class="${u.id===currentUser.id?'current-user':''}">
                 <td>${i===0?'🥇':i===1?'🥈':i===2?'🥉':'#'+(i+1)}</td>
-                <td><strong>${u.username}</strong> ${u.id===currentUser.id?'(toi)':''}</td>
+                <td>
+                  <div style="display:flex;align-items:center;gap:6px">
+                    ${getAvatarHtml(u, 24, 0.6)}
+                    <strong>${u.username}</strong> ${u.id===currentUser.id?'(toi)':''}
+                  </div>
+                </td>
                 <td>${Object.keys(u.preds||{}).length}</td>
                 <td style="color:var(--gold);font-weight:bold">${u.points} pts</td>
               </tr>
@@ -709,6 +816,38 @@ function openGroupChat(groupId, groupName) {
   document.getElementById('groupChatSection').style.display = 'block';
   document.getElementById('chatGroupName').textContent = groupName;
   document.getElementById('groupChatSection').scrollIntoView({ behavior: 'smooth' });
+
+  if (activeGroupChatUnsubscribe) activeGroupChatUnsubscribe();
+
+  if (firestore) {
+    try {
+      activeGroupChatUnsubscribe = firestore.collection('groups').doc(groupId).collection('messages')
+        .orderBy('timestamp', 'asc')
+        .limitToLast(40)
+        .onSnapshot(snap => {
+          const box = document.getElementById('chatMessagesBox');
+          let chatHtml = '';
+          snap.forEach(d => {
+            const m = d.data();
+            const isMine = m.senderId === currentUser.id;
+            const senderUser = appState.users.find(u => u.username === m.senderName) || { username: m.senderName };
+            const avatarHtml = getAvatarHtml(senderUser, 20, 0.5);
+
+            chatHtml += `
+              <div class="chat-msg ${isMine?'mine':''}" style="display:flex;gap:6px">
+                ${!isMine ? avatarHtml : ''}
+                <div style="flex:1">
+                  <div class="sender">${isMine ? 'Moi' : m.senderName}</div>
+                  <div>${m.text}</div>
+                </div>
+                ${isMine ? avatarHtml : ''}
+              </div>`;
+          });
+          box.innerHTML = chatHtml || '<p style="text-align:center;color:var(--text-muted);font-size:0.8rem">Aucun message pour l\'instant. Soyez le premier !</p>';
+          box.scrollTop = box.scrollHeight;
+        });
+    } catch (e) {}
+  }
 }
 
 async function handleSendChatMessage(e) {
@@ -907,65 +1046,11 @@ function renderAdminStats() {
     <div style="display:flex;justify-content:space-between;padding:6px 0"><span>Pronostics totaux</span><strong style="color:var(--gold)">${p}</strong></div>`;
 }
 
-function renderAdminLeagueBackgrounds() {
-  const container = document.getElementById('adminLeagueBackgrounds');
-  let html = '';
-  for (const [key, li] of Object.entries(LEAGUE_INFO)) {
-    const url = (appState.settings.leagueBackgrounds && appState.settings.leagueBackgrounds[key]) || li.defaultBg;
-    html += `
-      <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);flex-wrap:wrap">
-        <span style="min-width:140px;font-weight:600">${li.flag} ${li.name}</span>
-        <label style="background:var(--accent);color:white;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:bold">
-          📁 Fond PC
-          <input type="file" accept="image/*" style="display:none" onchange="uploadLeagueBgFromFile(event, '${key}')">
-        </label>
-        <img src="${url}" style="width:70px;height:40px;object-fit:cover;border-radius:4px;border:1px solid var(--border)">
-      </div>`;
-  }
-  container.innerHTML = html;
-}
-
-function renderAdminLeagueBanners() {
-  const container = document.getElementById('adminLeagueBanners');
-  let html = '';
-  for (const [key, li] of Object.entries(LEAGUE_INFO)) {
-    const url = (appState.settings.leagueBanners && appState.settings.leagueBanners[key]) || li.defaultBanner;
-    html += `
-      <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);flex-wrap:wrap">
-        <span style="min-width:140px;font-weight:600">${li.flag} ${li.name}</span>
-        <label style="background:var(--accent);color:white;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:bold">
-          📁 Bannière PC
-          <input type="file" accept="image/*" style="display:none" onchange="uploadBannerFromFile(event, '${key}')">
-        </label>
-        <img src="${url}" style="width:70px;height:40px;object-fit:cover;border-radius:4px;border:1px solid var(--border)">
-      </div>`;
-  }
-  container.innerHTML = html;
-}
-
-async function adminPublishAnnouncement() {
-  const t = document.getElementById('adminAnnounceInput').value.trim();
-  if (!t) return;
-  appState.settings.announce = t;
-  if (firestore) {
-    try { await firestore.collection('settings').doc('global').set({ announce: t }, { merge: true }); } catch (e) {}
-  }
-  alert('Annonce publiée ! 📢');
-}
-
-async function changeTheme(c) {
-  appState.settings.themeColor = c;
-  if (firestore) {
-    try { await firestore.collection('settings').doc('global').set({ themeColor: c }, { merge: true }); } catch (e) {}
-  }
-  applyTheme();
-}
-
 function filterLeague(l) {
   currentLeague = l;
   applyTheme();
   const matchesTitle = document.getElementById('matchesSectionTitle');
-  if (l === 'all') matchesTitle.textContent = "⚽ Calendrier 2026-27";
+  if (l === 'all') matchesTitle.textContent = "⚽ Calendrier Complet 2026-27";
   else if (LEAGUE_INFO[l]) matchesTitle.textContent = `${LEAGUE_INFO[l].flag} Calendrier ${LEAGUE_INFO[l].name}`;
   document.querySelectorAll('#page-matches .league-tab').forEach(t => t.classList.remove('active'));
   if (event && event.target) event.target.classList.add('active');
@@ -990,7 +1075,7 @@ function navigateTo(p) {
   if (page) page.classList.add('active');
   const btn = document.querySelector(`[onclick="navigateTo('${p}')"]`);
   if (btn) btn.classList.add('active');
-  if (p === 'admin') { renderAdminMatchList(); renderAdminStats(); renderAdminLeagueBanners(); renderAdminLeagueBackgrounds(); }
+  if (p === 'admin') { renderAdminMatchList(); renderAdminStats(); }
   if (p === 'leaderboard') renderLeaderboard();
   if (p === 'groups') renderGroups();
   if (p === 'chat') renderGlobalChat();
