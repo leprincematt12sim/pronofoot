@@ -71,84 +71,105 @@ let appState = {
     { id:'u3', username:'Marco_SerieA', email:'marco@test.com', pass:'123456', role:'user', points:31, preds:generateDemoPredictions(), bonuses:{}, groups:[], avatar:null }
   ],
   scores: JSON.parse(localStorage.getItem('pf_scores_v3')) || {},
-  groups: JSON.parse(localStorage.getItem('pf_groups_v3')) || [
-    {
-      id: 'grp_demo',
-      name: '⚽ Ligue des Amis VIP 2026-27',
-      code: 'FOOT26',
-      createdBy: 'admin',
-      creatorName: 'Admin',
-      members: ['admin', 'u1', 'u2', 'u3'],
-      createdAt: new Date().toISOString()
-    }
-  ],
-  globalChat: JSON.parse(localStorage.getItem('pf_global_chat')) || [
-    { senderName: "Alex_PL", text: "Salut à tous les supporters ! Prêts pour la saison ?", time: "12:00" },
-    { senderName: "Sophie_L1", text: "Allez Paris SG cette saison !", time: "12:05" }
-  ],
+  groups: JSON.parse(localStorage.getItem('pf_groups_v3')) || [],
+  globalChat: JSON.parse(localStorage.getItem('pf_global_chat')) || [],
   pollVotes: { real: 45, psg: 30, mancity: 25 },
   settings: {
     announce: 'Bienvenue sur la saison 2026-27 de PronoFoot ! ⚽',
     bgImage: 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=1920&q=80',
     leagueBanners: {},
     leagueBackgrounds: {},
-    themeColor: '#e94560'
+    themeColor: '#e94560',
+    apiKey: localStorage.getItem('pf_api_key') || ''
   }
 };
 
 let currentUser = JSON.parse(localStorage.getItem('pf_cloud_session')) || null;
 let currentLeague = 'all';
 let currentMonth = 'all';
-let activeGroup = null;
-let activeGroupChatUnsubscribe = null;
 
 function getTeamCrest(name) {
   return TEAM_CRESTS[name] || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=16213e&color=fff&size=64&bold=true`;
 }
 
-function compressAndReadFile(file, maxWidth, callback) {
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    const img = new Image();
-    img.onload = function() {
-      const canvas = document.createElement('canvas');
-      let width = img.width;
-      let height = img.height;
-      if (width > maxWidth) {
-        height = Math.round((height * maxWidth) / width);
-        width = maxWidth;
+// FONCTION DE SYNCHRO API-SPORTS AUTOMATIQUE
+async function saveAndSyncApiSports() {
+  const apiKey = document.getElementById('adminApiKeyInput').value.trim();
+  const statusEl = document.getElementById('apiSyncStatus');
+
+  if (!apiKey) {
+    alert("Veuillez coller votre clé API-Sports !");
+    return;
+  }
+
+  statusEl.textContent = "⏳ Synchro en cours avec API-Sports...";
+  appState.settings.apiKey = apiKey;
+  localStorage.setItem('pf_api_key', apiKey);
+
+  try {
+    // Appel direct à l'API-Football pour récupérer les matchs du jour
+    const response = await fetch(`https://v3.football.api-sports.io/fixtures?date=${new Date().toISOString().split('T')[0]}`, {
+      method: "GET",
+      headers: {
+        "x-apisports-key": apiKey
       }
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, width, height);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-      callback(dataUrl);
-    };
-    img.src = e.target.result;
-  };
-  reader.readAsDataURL(file);
-}
+    });
 
-async function uploadUserAvatar(event) {
-  const file = event.target.files[0];
-  if (!file || !currentUser) return;
+    const data = await response.json();
+    const fixtures = data.response || [];
+    let updatedCount = 0;
 
-  compressAndReadFile(file, 200, async function(dataUrl) {
-    currentUser.avatar = dataUrl;
-    const idx = appState.users.findIndex(u => u.id === currentUser.id);
-    if (idx !== -1) appState.users[idx].avatar = dataUrl;
-    localStorage.setItem('pf_local_users', JSON.stringify(appState.users));
-    localStorage.setItem('pf_cloud_session', JSON.stringify(currentUser));
-    
+    fixtures.forEach(f => {
+      if (['FT', 'AET', 'PEN'].includes(f.fixture.status.short)) {
+        const homeName = f.teams.home.name;
+        const awayName = f.teams.away.name;
+        
+        // Trouver le match correspondant dans notre calendrier
+        const match = ALL_MATCHES.find(m => 
+          m.home.toLowerCase().includes(homeName.toLowerCase()) || 
+          m.away.toLowerCase().includes(awayName.toLowerCase())
+        );
+
+        if (match) {
+          appState.scores[match.id] = { h: f.goals.home, a: f.goals.away };
+          updatedCount++;
+        }
+      }
+    });
+
+    // Enregistrer les nouveaux scores dans Firebase
+    localStorage.setItem('pf_scores_v3', JSON.stringify(appState.scores));
     if (firestore) {
-      try { await firestore.collection('users').doc(currentUser.id).update({ avatar: dataUrl }); } catch (err) {}
+      await firestore.collection('settings').doc('global').set({
+        scores: appState.scores,
+        apiKey: apiKey
+      }, { merge: true });
     }
+
+    recalculateAllCloudPoints();
     updateUI();
+    renderMatches();
     renderLeaderboard();
     renderDashboardLeaderboard();
-    alert('📸 Photo de profil mise à jour avec succès !');
-  });
+    renderAdminMatchList();
+    
+    statusEl.textContent = `✅ Synchro réussie ! ${updatedCount} score(s) réel(s) mis à jour.`;
+    alert(`⚡ Synchro terminée ! ${updatedCount} score(s) de match réel(s) synchronisé(s) et points recalculés !`);
+  } catch (err) {
+    statusEl.textContent = "❌ Erreur de connexion API-Sports : " + err.message;
+    alert("Erreur API-Sports : " + err.message);
+  }
+}
+
+function saveApiKeyOnly() {
+  const apiKey = document.getElementById('adminApiKeyInput').value.trim();
+  if (!apiKey) return;
+  appState.settings.apiKey = apiKey;
+  localStorage.setItem('pf_api_key', apiKey);
+  if (firestore) {
+    firestore.collection('settings').doc('global').set({ apiKey: apiKey }, { merge: true });
+  }
+  alert("Clé API sauvegardée avec succès ! 🔑");
 }
 
 function listenCloudData() {
@@ -185,6 +206,9 @@ function listenCloudData() {
         const data = doc.data();
         appState.scores = data.scores || {};
         appState.settings = { ...appState.settings, ...data };
+        if (appState.settings.apiKey) {
+          localStorage.setItem('pf_api_key', appState.settings.apiKey);
+        }
         applyTheme();
         if (appState.settings.announce) {
           document.getElementById('announcementBox').style.display = 'block';
@@ -200,16 +224,6 @@ function listenCloudData() {
           renderAdminStats();
         }
       }
-    });
-
-    firestore.collection('groups').onSnapshot(snap => {
-      const cloudGroups = [];
-      snap.forEach(d => cloudGroups.push({ id: d.id, ...d.data() }));
-      if (cloudGroups.length > 0) {
-        appState.groups = cloudGroups;
-        localStorage.setItem('pf_groups_v3', JSON.stringify(appState.groups));
-      }
-      renderGroups();
     });
   } catch (err) {}
 }
@@ -290,6 +304,9 @@ function setupApp() {
     document.getElementById('topAdminBtn').style.display = 'block';
     renderAdminMatchList();
     renderAdminStats();
+    if (document.getElementById('adminApiKeyInput')) {
+      document.getElementById('adminApiKeyInput').value = appState.settings.apiKey || localStorage.getItem('pf_api_key') || '';
+    }
   } else {
     document.getElementById('adminNavBtn').style.display = 'none';
     document.getElementById('topAdminBtn').style.display = 'none';
@@ -600,26 +617,6 @@ async function handleSendGlobalChatMessage(e) {
   renderGlobalChat();
 }
 
-function votePoll(option) {
-  if (option === 'real') appState.pollVotes.real += 5;
-  if (option === 'psg') appState.pollVotes.psg += 5;
-  if (option === 'mancity') appState.pollVotes.mancity += 5;
-
-  const total = appState.pollVotes.real + appState.pollVotes.psg + appState.pollVotes.mancity;
-  const pReal = Math.round((appState.pollVotes.real / total) * 100);
-  const pPsg = Math.round((appState.pollVotes.psg / total) * 100);
-  const pMC = Math.round((appState.pollVotes.mancity / total) * 100);
-
-  document.getElementById('bar_real').style.width = pReal + '%';
-  document.getElementById('count_real').textContent = pReal + '%';
-  document.getElementById('bar_psg').style.width = pPsg + '%';
-  document.getElementById('count_psg').textContent = pPsg + '%';
-  document.getElementById('bar_mancity').style.width = pMC + '%';
-  document.getElementById('count_mancity').textContent = pMC + '%';
-
-  alert('A voté ! 📊');
-}
-
 function renderMatches() {
   const container = document.getElementById('matchesContainer');
   let list = ALL_MATCHES;
@@ -692,7 +689,6 @@ function renderMatches() {
   container.innerHTML = html;
 }
 
-// === GROUPES PRIVÉS & INVITATION WHATSAPP ===
 async function showCreateGroupPrompt() {
   const name = prompt("Nom de votre Groupe Privé (ex: Les Potes du Foot) :");
   if (!name || !name.trim()) return;
@@ -722,13 +718,13 @@ async function showCreateGroupPrompt() {
   const inviteText = `Salut ! Rejoins mon groupe "${name}" sur PronoFoot pour la saison 2026-27 !\n\n1. Va sur le site\n2. Clique sur "Groupes" > "Rejoindre avec un Code"\n3. Tape ce code : ${code}`;
   const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(inviteText)}`;
   
-  if (confirm(`✅ Groupe "${name}" créé !\nCode d'invitation : ${code}\n\nVoulez-vous inviter vos amis sur WhatsApp ?`)) {
+  if (confirm(`✅ Groupe "${name}" créé !\nCode : ${code}\n\nEnvoyer l'invitation sur WhatsApp ?`)) {
     window.open(whatsappUrl, '_blank');
   }
 }
 
 async function showJoinGroupPrompt() {
-  const code = prompt("Entrez le code du groupe (ex: GRP-ABCD ou FOOT26) :");
+  const code = prompt("Entrez le code du groupe (ex: GRP-ABCD) :");
   if (!code || !code.trim()) return;
 
   const cleanCode = code.trim().toUpperCase();
@@ -744,22 +740,6 @@ async function showJoinGroupPrompt() {
     return;
   }
 
-  if (firestore) {
-    try {
-      const query = await firestore.collection('groups').where('code', '==', cleanCode).get();
-      if (!query.empty) {
-        const groupDoc = query.docs[0];
-        if (currentUser) {
-          await firestore.collection('groups').doc(groupDoc.id).update({
-            members: firebase.firestore.FieldValue.arrayUnion(currentUser.id)
-          });
-        }
-        alert(`🎉 Vous avez rejoint le groupe "${groupDoc.data().name}" !`);
-        return;
-      }
-    } catch (e) {}
-  }
-
   alert("❌ Code invalide.");
 }
 
@@ -772,18 +752,14 @@ function renderGroups() {
   const container = document.getElementById('groupsListContainer');
   if (!container) return;
 
-  // Si pas de groupe créé par l'utilisateur, afficher tous les groupes auxquels il appartient (ou le groupe exemple)
   let myGroups = [];
   if (currentUser) {
     myGroups = appState.groups.filter(g => g.members && g.members.includes(currentUser.id));
   }
-  
-  if (myGroups.length === 0) {
-    myGroups = appState.groups; // Afficher tous les groupes disponibles si aucun spécifique
-  }
+  if (myGroups.length === 0) myGroups = appState.groups;
 
   if (myGroups.length === 0) {
-    container.innerHTML = '<div class="rules-box"><p style="text-align:center">Aucun groupe privé. Créez-en un en cliquat sur le bouton ci-dessus !</p></div>';
+    container.innerHTML = '<div class="rules-box"><p style="text-align:center">Aucun groupe privé. Créez-en un avec le bouton ci-dessus !</p></div>';
     return;
   }
 
@@ -826,33 +802,6 @@ function renderGroups() {
   });
 
   container.innerHTML = html;
-}
-
-function openGroupChat(groupId, groupName) {
-  activeGroup = { id: groupId, name: groupName };
-  document.getElementById('groupChatSection').style.display = 'block';
-  document.getElementById('chatGroupName').textContent = groupName;
-  document.getElementById('groupChatSection').scrollIntoView({ behavior: 'smooth' });
-}
-
-async function handleSendChatMessage(e) {
-  e.preventDefault();
-  if (!activeGroup || !currentUser) return;
-  const input = document.getElementById('chatInputText');
-  const txt = input.value.trim();
-  if (!txt) return;
-
-  input.value = '';
-  if (firestore) {
-    try {
-      await firestore.collection('groups').doc(activeGroup.id).collection('messages').add({
-        senderId: currentUser.id,
-        senderName: currentUser.username,
-        text: txt,
-        timestamp: firebase.firestore.FieldValue.serverTimestamp()
-      });
-    } catch (e) {}
-  }
 }
 
 async function saveAll() {
