@@ -1,5 +1,5 @@
 ﻿// ============================================
-// PRONOFOOT — MOTEUR FIREBASE CLOUD EN TEMPS RÉEL
+// PRONOFOOT — MOTEUR CLOUD COMPLET (Logos, Groupes, Chat)
 // ============================================
 
 const firebaseConfig = {
@@ -11,9 +11,33 @@ const firebaseConfig = {
   appId: "1:163921400915:web:90d3b4ffeb1cb1bd99a2a6"
 };
 
-// Initialisation Firebase
 firebase.initializeApp(firebaseConfig);
 const firestore = firebase.firestore();
+
+// DICTIONNAIRE OFFICIEL DES ÉCUSSONS HD DES CLUBS
+const TEAM_CRESTS = {
+  "Arsenal": "https://media.api-sports.io/football/teams/42.png",
+  "Manchester City": "https://media.api-sports.io/football/teams/50.png",
+  "Liverpool": "https://media.api-sports.io/football/teams/40.png",
+  "Manchester United": "https://media.api-sports.io/football/teams/33.png",
+  "Chelsea": "https://media.api-sports.io/football/teams/49.png",
+  "Tottenham": "https://media.api-sports.io/football/teams/47.png",
+  "Newcastle": "https://media.api-sports.io/football/teams/34.png",
+  "Real Madrid": "https://media.api-sports.io/football/teams/541.png",
+  "FC Barcelone": "https://media.api-sports.io/football/teams/529.png",
+  "Atlético Madrid": "https://media.api-sports.io/football/teams/530.png",
+  "Paris Saint-Germain": "https://media.api-sports.io/football/teams/85.png",
+  "Olympique de Marseille": "https://media.api-sports.io/football/teams/81.png",
+  "Bayern Munich": "https://media.api-sports.io/football/teams/157.png",
+  "Borussia Dortmund": "https://media.api-sports.io/football/teams/165.png",
+  "Inter Milan": "https://media.api-sports.io/football/teams/505.png",
+  "AC Milan": "https://media.api-sports.io/football/teams/489.png",
+  "Juventus": "https://media.api-sports.io/football/teams/496.png",
+  "Naples": "https://media.api-sports.io/football/teams/492.png",
+  "AS Rome": "https://media.api-sports.io/football/teams/497.png"
+};
+
+const DEFAULT_CREST = "https://media.api-sports.io/football/teams/50.png";
 
 const BONUS_CONFIG = [
   { id:'ucl_win', label:'🏆 Vainqueur Ligue des Champions 2026-27', pts:75, teams:['Real Madrid','FC Barcelone','Manchester City','Bayern Munich','Paris Saint-Germain','Arsenal','Liverpool','Inter Milan','Borussia Dortmund','Atlético Madrid'] },
@@ -38,6 +62,7 @@ const AVATAR_COLORS = ['#e94560','#00b894','#6c5ce7','#f5c518','#0984e3','#e1705
 let appState = {
   users: [],
   scores: {},
+  groups: [],
   settings: {
     announce: 'Bienvenue sur la saison 2026-27 de PronoFoot ! ⚽',
     bgImage: 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=1920&q=80',
@@ -49,28 +74,33 @@ let appState = {
 
 let currentUser = JSON.parse(localStorage.getItem('pf_cloud_session')) || null;
 let currentLeague = 'all';
+let currentMonth = 'all';
+let activeGroup = null;
+let activeGroupChatUnsubscribe = null;
 
-// Écouteur Firestore en temps réel pour synchroniser tous les joueurs instantanément
+function getTeamCrest(name) {
+  return TEAM_CRESTS[name] || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=16213e&color=fff&size=64&bold=true`;
+}
+
+// Synchronisation Firestore
 function listenCloudData() {
-  // 1. Écouter tous les utilisateurs et leurs pronostics
-  firestore.collection('users').onSnapshot(snapshot => {
+  // 1. Utilisateurs
+  firestore.collection('users').onSnapshot(snap => {
     appState.users = [];
-    snapshot.forEach(doc => {
-      appState.users.push({ id: doc.id, ...doc.data() });
-    });
-    
+    snap.forEach(d => appState.users.push({ id: d.id, ...d.data() }));
     if (currentUser) {
-      const updated = appState.users.find(u => u.id === currentUser.id);
-      if (updated) currentUser = updated;
+      const u = appState.users.find(x => x.id === currentUser.id);
+      if (u) currentUser = u;
     }
     recalculateAllCloudPoints();
     updateUI();
     renderMatches();
     renderLeaderboard();
     renderDashboardLeaderboard();
-  }, err => console.log('Sync Users:', err.message));
+    renderGroups();
+  });
 
-  // 2. Écouter les scores et paramètres généraux (Bannières, thèmes, annonces)
+  // 2. Paramètres globaux & Scores
   firestore.collection('settings').doc('global').onSnapshot(doc => {
     if (doc.exists) {
       const data = doc.data();
@@ -91,7 +121,14 @@ function listenCloudData() {
         renderAdminStats();
       }
     }
-  }, err => console.log('Sync Settings:', err.message));
+  });
+
+  // 3. Groupes Privés
+  firestore.collection('groups').onSnapshot(snap => {
+    appState.groups = [];
+    snap.forEach(d => appState.groups.push({ id: d.id, ...d.data() }));
+    renderGroups();
+  });
 }
 
 function calcPts(pred, score) {
@@ -119,9 +156,7 @@ function getUserStats(u) {
     const s = appState.scores[id];
     if (!s) { pe++; continue; }
     const pts = calcPts(p, s);
-    if (pts===5) ex++;
-    else if (pts===3) co++;
-    else wr++;
+    if (pts===5) ex++; else if (pts===3) co++; else wr++;
   }
   return { exact:ex, correct:co, wrong:wr, pending:pe, total:Object.keys(u.preds||{}).length };
 }
@@ -135,7 +170,7 @@ function applyTheme() {
 
   if (currentLeague !== 'all' && LEAGUE_INFO[currentLeague]) {
     const li = LEAGUE_INFO[currentLeague];
-    currentBg = appState.settings.leagueBackgrounds[currentLeague] || li.defaultBg;
+    currentBg = (appState.settings.leagueBackgrounds && appState.settings.leagueBackgrounds[currentLeague]) || li.defaultBg;
     activeAccent = li.accent;
   }
 
@@ -147,7 +182,6 @@ function applyTheme() {
 
 function init() {
   listenCloudData();
-
   if (currentUser) {
     document.getElementById('authScreen').style.display = 'none';
     setupApp();
@@ -163,6 +197,7 @@ function setupApp() {
   renderLeaderboard();
   renderDashboardLeaderboard();
   renderBonuses();
+  renderGroups();
   
   if (currentUser && currentUser.role === 'admin') {
     document.getElementById('adminNavBtn').style.display = 'flex';
@@ -177,7 +212,6 @@ function setupApp() {
   }
 }
 
-// === AUTHENTIFICATION CLOUD ===
 function switchAuth(tab) {
   document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
   document.getElementById('authError').style.display = 'none';
@@ -207,7 +241,6 @@ async function handleLogin(e) {
       btn.disabled = false;
       return;
     }
-
     const userDoc = query.docs[0];
     currentUser = { id: userDoc.id, ...userDoc.data() };
     localStorage.setItem('pf_cloud_session', JSON.stringify(currentUser));
@@ -236,18 +269,7 @@ async function handleRegister(e) {
       btn.disabled = false;
       return;
     }
-
-    const newUser = {
-      username,
-      email,
-      pass,
-      role: 'user',
-      points: 0,
-      preds: {},
-      bonuses: {},
-      createdAt: new Date().toISOString()
-    };
-
+    const newUser = { username, email, pass, role: 'user', points: 0, preds: {}, bonuses: {}, groups: [], createdAt: new Date().toISOString() };
     const ref = await firestore.collection('users').add(newUser);
     currentUser = { id: ref.id, ...newUser };
     localStorage.setItem('pf_cloud_session', JSON.stringify(currentUser));
@@ -263,15 +285,7 @@ async function handleRegister(e) {
 async function quickAdminLogin() {
   const query = await firestore.collection('users').where('role', '==', 'admin').get();
   if (query.empty) {
-    const adminUser = {
-      username: 'Admin',
-      email: 'admin@pronofoot.com',
-      pass: 'admin123',
-      role: 'admin',
-      points: 0,
-      preds: {},
-      bonuses: {}
-    };
+    const adminUser = { username: 'Admin', email: 'admin@pronofoot.com', pass: 'admin123', role: 'admin', points: 0, preds: {}, bonuses: {}, groups: [] };
     const ref = await firestore.collection('users').add(adminUser);
     currentUser = { id: ref.id, ...adminUser };
   } else {
@@ -390,10 +404,18 @@ function renderLeaderboard() {
   document.getElementById('leaderboardContainer').innerHTML = html;
 }
 
+// RENDU DES MATCHS AVEC LOGOS ET FILTRES
 function renderMatches() {
   const container = document.getElementById('matchesContainer');
   let list = ALL_MATCHES;
-  if (currentLeague !== 'all') list = ALL_MATCHES.filter(m => m.league === currentLeague);
+
+  if (currentLeague !== 'all') list = list.filter(m => m.league === currentLeague);
+  if (currentMonth !== 'all') {
+    list = list.filter(m => {
+      const parts = m.date.split('/');
+      return parts.length === 3 && parts[1] === currentMonth;
+    });
+  }
 
   const bannerArea = document.getElementById('leagueBannerArea');
   if (currentLeague !== 'all' && LEAGUE_INFO[currentLeague]) {
@@ -404,12 +426,19 @@ function renderMatches() {
     bannerArea.innerHTML = '';
   }
 
+  if (list.length === 0) {
+    container.innerHTML = '<p style="text-align:center;color:var(--text-muted);padding:40px">Aucun match trouvé pour ce filtre.</p>';
+    return;
+  }
+
   let html = '';
   list.forEach(m => {
     const pred = (currentUser && currentUser.preds && currentUser.preds[m.id]) || { h:'', a:'' };
     const score = appState.scores[m.id];
     const done = !!score;
     const li = LEAGUE_INFO[m.league] || { name:m.league, flag:'⚽' };
+    const homeCrest = getTeamCrest(m.home);
+    const awayCrest = getTeamCrest(m.away);
 
     let res = '';
     if (done) {
@@ -426,9 +455,15 @@ function renderMatches() {
           <span style="color:var(--gold)">📅 ${m.date}</span>
         </div>
         <div class="match-teams">
-          <div class="match-team home">${m.home}</div>
+          <div class="match-team home">
+            <span>${m.home}</span>
+            <img src="${homeCrest}" class="team-crest" alt="${m.home}">
+          </div>
           <div class="match-vs">${done ? score.h + ' - ' + score.a : 'VS'}</div>
-          <div class="match-team away">${m.away}</div>
+          <div class="match-team away">
+            <img src="${awayCrest}" class="team-crest" alt="${m.away}">
+            <span>${m.away}</span>
+          </div>
         </div>
         ${!done ? `
         <div class="match-prediction">
@@ -442,7 +477,147 @@ function renderMatches() {
   container.innerHTML = html;
 }
 
-// Enregistrer les pronostics directement sur Firebase Firestore
+// GESTION DES GROUPES PRIVÉS (CONCEPT KICKTIPP)
+async function showCreateGroupPrompt() {
+  const name = prompt("Nom de votre Groupe Privé (ex: Les Potes du Foot) :");
+  if (!name || !name.trim()) return;
+
+  const code = 'GRP-' + Math.random().toString(36).substring(2, 6).toUpperCase();
+  const newGroup = {
+    name: name.trim(),
+    code: code,
+    createdBy: currentUser.id,
+    creatorName: currentUser.username,
+    members: [currentUser.id],
+    createdAt: new Date().toISOString()
+  };
+
+  const ref = await firestore.collection('groups').add(newGroup);
+  alert(`✅ Groupe "${name}" créé avec succès !\n\n🔑 Partagez ce code à vos amis : ${code}`);
+}
+
+async function showJoinGroupPrompt() {
+  const code = prompt("Entrez le code du groupe privé (ex: GRP-ABCD) :");
+  if (!code || !code.trim()) return;
+
+  const cleanCode = code.trim().toUpperCase();
+  const query = await firestore.collection('groups').where('code', '==', cleanCode).get();
+
+  if (query.empty) {
+    alert("❌ Code de groupe invalide.");
+    return;
+  }
+
+  const groupDoc = query.docs[0];
+  const groupData = groupDoc.data();
+
+  if (groupData.members && groupData.members.includes(currentUser.id)) {
+    alert("Vous faites déjà partie de ce groupe !");
+    return;
+  }
+
+  await firestore.collection('groups').doc(groupDoc.id).update({
+    members: firebase.firestore.FieldValue.arrayUnion(currentUser.id)
+  });
+
+  alert(`🎉 Félicitations ! Vous avez rejoint le groupe "${groupData.name}".`);
+}
+
+function renderGroups() {
+  const container = document.getElementById('groupsListContainer');
+  if (!currentUser) return;
+
+  const myGroups = appState.groups.filter(g => g.members && g.members.includes(currentUser.id));
+
+  if (myGroups.length === 0) {
+    container.innerHTML = '<div class="rules-box"><p style="text-align:center">Vous ne faites partie d\'aucun groupe privé pour l\'instant.<br>Créez-en un ou rejoignez vos amis avec leur code !</p></div>';
+    document.getElementById('groupChatSection').style.display = 'none';
+    return;
+  }
+
+  let html = '';
+  myGroups.forEach(g => {
+    // Calcul du classement dans ce groupe
+    const groupUsers = appState.users.filter(u => g.members.includes(u.id)).sort((a,b) => b.points - a.points);
+
+    html += `
+      <div class="group-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+          <div>
+            <h3 style="color:var(--accent);margin-bottom:2px">${g.name}</h3>
+            <span style="font-size:0.8rem;color:var(--text-muted)">Créé par ${g.creatorName} · ${groupUsers.length} joueur(s)</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span class="group-code-badge">${g.code}</span>
+            <button class="btn btn-secondary btn-xs" onclick="openGroupChat('${g.id}', '${g.name.replace(/'/g, "\\'")}')">💬 Chat</button>
+          </div>
+        </div>
+
+        <table class="leaderboard-table" style="font-size:0.85rem">
+          <thead><tr><th>#</th><th>Membre</th><th>Pronos</th><th>Points</th></tr></thead>
+          <tbody>
+            ${groupUsers.map((u, i) => `
+              <tr class="${u.id===currentUser.id?'current-user':''}">
+                <td>${i===0?'🥇':i===1?'🥈':i===2?'🥉':'#'+(i+1)}</td>
+                <td><strong>${u.username}</strong> ${u.id===currentUser.id?'(toi)':''}</td>
+                <td>${Object.keys(u.preds||{}).length}</td>
+                <td style="color:var(--gold);font-weight:bold">${u.points} pts</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  });
+
+  container.innerHTML = html;
+}
+
+// CHAT EN DIRECT DANS LE GROUPE
+function openGroupChat(groupId, groupName) {
+  activeGroup = { id: groupId, name: groupName };
+  document.getElementById('groupChatSection').style.display = 'block';
+  document.getElementById('chatGroupName').textContent = groupName;
+  document.getElementById('groupChatSection').scrollIntoView({ behavior: 'smooth' });
+
+  if (activeGroupChatUnsubscribe) activeGroupChatUnsubscribe();
+
+  activeGroupChatUnsubscribe = firestore.collection('groups').doc(groupId).collection('messages')
+    .orderBy('timestamp', 'asc')
+    .limitToLast(40)
+    .onSnapshot(snap => {
+      const box = document.getElementById('chatMessagesBox');
+      let chatHtml = '';
+      snap.forEach(d => {
+        const m = d.data();
+        const isMine = m.senderId === currentUser.id;
+        chatHtml += `
+          <div class="chat-msg ${isMine?'mine':''}">
+            <div class="sender">${isMine ? 'Moi' : m.senderName}</div>
+            <div>${m.text}</div>
+          </div>`;
+      });
+      box.innerHTML = chatHtml || '<p style="text-align:center;color:var(--text-muted);font-size:0.8rem">Aucun message pour l\'instant. Soyez le premier !</p>';
+      box.scrollTop = box.scrollHeight;
+    });
+}
+
+async function handleSendChatMessage(e) {
+  e.preventDefault();
+  if (!activeGroup || !currentUser) return;
+  const input = document.getElementById('chatInputText');
+  const txt = input.value.trim();
+  if (!txt) return;
+
+  input.value = '';
+  await firestore.collection('groups').doc(activeGroup.id).collection('messages').add({
+    senderId: currentUser.id,
+    senderName: currentUser.username,
+    text: txt,
+    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+  });
+}
+
+// SAUVEGARDE DES PRONOS
 async function saveAll() {
   if (!currentUser) return;
   if (!currentUser.preds) currentUser.preds = {};
@@ -459,13 +634,11 @@ async function saveAll() {
   });
 
   try {
-    await firestore.collection('users').doc(currentUser.id).update({
-      preds: currentUser.preds
-    });
+    await firestore.collection('users').doc(currentUser.id).update({ preds: currentUser.preds });
     localStorage.setItem('pf_cloud_session', JSON.stringify(currentUser));
-    alert(`${count} pronostics enregistrés dans le Cloud Firebase ! ☁️✅`);
+    alert(`${count} pronostics enregistrés dans le Cloud ! ☁️✅`);
   } catch (err) {
-    alert('Erreur de sauvegarde : ' + err.message);
+    alert('Erreur : ' + err.message);
   }
 }
 
@@ -489,26 +662,21 @@ function renderBonuses() {
 async function saveBonuses() {
   if (!currentUser) return;
   if (!currentUser.bonuses) currentUser.bonuses = {};
-
   BONUS_CONFIG.forEach(b => {
     const v = document.getElementById('bonus_' + b.id)?.value;
     if (v) currentUser.bonuses[b.id] = v;
   });
-
-  await firestore.collection('users').doc(currentUser.id).update({
-    bonuses: currentUser.bonuses
-  });
+  await firestore.collection('users').doc(currentUser.id).update({ bonuses: currentUser.bonuses });
   localStorage.setItem('pf_cloud_session', JSON.stringify(currentUser));
   alert('Bonus sauvegardés dans le Cloud ! 🎯');
 }
 
-// === ACTIONS ADMINISTRATEUR CLOUD ===
+// ADMIN ACTIONS
 function renderAdminMatchList() {
   let html = '';
   ALL_MATCHES.slice(0, 50).forEach(m => {
     const s = appState.scores[m.id];
     const li = LEAGUE_INFO[m.league] || { flag:'⚽' };
-
     html += `
       <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);flex-wrap:wrap">
         <span style="font-size:0.75rem;color:var(--text-dim);min-width:70px">${m.date}</span>
@@ -518,7 +686,7 @@ function renderAdminMatchList() {
         <span>-</span>
         <input type="number" min="0" max="15" value="${s?s.a:''}" id="aa_${m.id}" placeholder="A" style="width:38px;padding:5px;text-align:center;background:var(--bg-dark);border:1px solid var(--border);color:white;border-radius:4px;font-weight:bold">
         <button class="btn btn-primary btn-xs" onclick="adminSaveScore('${m.id}')">Valider</button>
-        <span style="font-size:0.75rem;font-weight:bold;color:${s?'var(--green)':'var(--text-dim)'}">${s?'✅ Enregistré':'⏳ En attente'}</span>
+        <span style="font-size:0.75rem;font-weight:bold;color:${s?'var(--green)':'var(--text-dim)'}">${s?'✅':'⏳'}</span>
       </div>`;
   });
   document.getElementById('adminMatchList').innerHTML = html;
@@ -528,11 +696,8 @@ async function adminSaveScore(id) {
   const h = parseInt(document.getElementById('ah_' + id)?.value);
   const a = parseInt(document.getElementById('aa_' + id)?.value);
   if (isNaN(h) || isNaN(a)) { alert('Entrez les 2 scores !'); return; }
-
   appState.scores[id] = { h, a };
-  await firestore.collection('settings').doc('global').set({
-    scores: appState.scores
-  }, { merge: true });
+  await firestore.collection('settings').doc('global').set({ scores: appState.scores }, { merge: true });
 }
 
 async function adminSimulateScores() {
@@ -542,94 +707,34 @@ async function adminSimulateScores() {
     c++;
   });
   await firestore.collection('settings').doc('global').set({ scores: appState.scores }, { merge: true });
-  alert(`${c} scores simulés sur le Cloud ! 🎲`);
+  alert(`${c} scores simulés ! 🎲`);
 }
 
 async function adminSimulateAll() {
-  if (!confirm('Simuler TOUS les matchs sur Firebase ?')) return;
+  if (!confirm('Simuler TOUS les matchs ?')) return;
   ALL_MATCHES.forEach(m => {
-    if (!appState.scores[m.id]) {
-      appState.scores[m.id] = { h: Math.floor(Math.random()*4), a: Math.floor(Math.random()*3) };
-    }
+    if (!appState.scores[m.id]) appState.scores[m.id] = { h: Math.floor(Math.random()*4), a: Math.floor(Math.random()*3) };
   });
   await firestore.collection('settings').doc('global').set({ scores: appState.scores }, { merge: true });
-  alert('Tous les matchs ont été simulés sur le Cloud ! 🏆');
+  alert('Tous les matchs simulés ! 🏆');
 }
 
 async function adminResetScores() {
-  if (!confirm('Supprimer tous les scores enregistrés ?')) return;
+  if (!confirm('Supprimer tous les scores ?')) return;
   appState.scores = {};
   await firestore.collection('settings').doc('global').set({ scores: {} }, { merge: true });
-  alert('Tous les scores ont été réinitialisés sur Firebase ! 🗑️');
+  alert('Scores réinitialisés ! 🗑️');
 }
 
 function renderAdminStats() {
   const t = ALL_MATCHES.length;
   const s = Object.keys(appState.scores).length;
   const p = appState.users.reduce((a, u) => a + Object.keys(u.preds || {}).length, 0);
-
   document.getElementById('adminStats').innerHTML = `
     <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)"><span>Matchs 2026-27</span><strong>${t}</strong></div>
     <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)"><span>Scores validés</span><strong style="color:var(--green)">${s}</strong></div>
-    <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)"><span>Joueurs Cloud inscrits</span><strong>${appState.users.length}</strong></div>
+    <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)"><span>Joueurs Cloud</span><strong>${appState.users.length}</strong></div>
     <div style="display:flex;justify-content:space-between;padding:6px 0"><span>Pronostics totaux</span><strong style="color:var(--gold)">${p}</strong></div>`;
-}
-
-// Upload direct de photos dans Firestore
-function compressAndReadFile(file, maxWidth, callback) {
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    const img = new Image();
-    img.onload = function() {
-      const canvas = document.createElement('canvas');
-      let width = img.width;
-      let height = img.height;
-      if (width > maxWidth) {
-        height = Math.round((height * maxWidth) / width);
-        width = maxWidth;
-      }
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, width, height);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-      callback(dataUrl);
-    };
-    img.src = e.target.result;
-  };
-  reader.readAsDataURL(file);
-}
-
-function uploadBgFromFile(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  compressAndReadFile(file, 1600, async function(dataUrl) {
-    appState.settings.bgImage = dataUrl;
-    await firestore.collection('settings').doc('global').set({ bgImage: dataUrl }, { merge: true });
-    alert('Fond d\'écran synchronisé sur le Cloud ! 🖼️');
-  });
-}
-
-function uploadLeagueBgFromFile(event, leagueKey) {
-  const file = event.target.files[0];
-  if (!file) return;
-  compressAndReadFile(file, 1600, async function(dataUrl) {
-    if (!appState.settings.leagueBackgrounds) appState.settings.leagueBackgrounds = {};
-    appState.settings.leagueBackgrounds[leagueKey] = dataUrl;
-    await firestore.collection('settings').doc('global').set({ leagueBackgrounds: appState.settings.leagueBackgrounds }, { merge: true });
-    alert(`Fond d'écran sauvegardé pour ${LEAGUE_INFO[leagueKey].name} ! 🏟️`);
-  });
-}
-
-function uploadBannerFromFile(event, leagueKey) {
-  const file = event.target.files[0];
-  if (!file) return;
-  compressAndReadFile(file, 1200, async function(dataUrl) {
-    if (!appState.settings.leagueBanners) appState.settings.leagueBanners = {};
-    appState.settings.leagueBanners[leagueKey] = dataUrl;
-    await firestore.collection('settings').doc('global').set({ leagueBanners: appState.settings.leagueBanners }, { merge: true });
-    alert(`Bannière sauvegardée pour ${LEAGUE_INFO[leagueKey].name} !`);
-  });
 }
 
 function renderAdminLeagueBackgrounds() {
@@ -641,7 +746,7 @@ function renderAdminLeagueBackgrounds() {
       <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);flex-wrap:wrap">
         <span style="min-width:140px;font-weight:600">${li.flag} ${li.name}</span>
         <label style="background:var(--accent);color:white;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:bold">
-          📁 Charger photo fond
+          📁 Fond PC
           <input type="file" accept="image/*" style="display:none" onchange="uploadLeagueBgFromFile(event, '${key}')">
         </label>
         <img src="${url}" style="width:70px;height:40px;object-fit:cover;border-radius:4px;border:1px solid var(--border)">
@@ -659,7 +764,7 @@ function renderAdminLeagueBanners() {
       <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);flex-wrap:wrap">
         <span style="min-width:140px;font-weight:600">${li.flag} ${li.name}</span>
         <label style="background:var(--accent);color:white;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:bold">
-          📁 Charger bannière
+          📁 Bannière PC
           <input type="file" accept="image/*" style="display:none" onchange="uploadBannerFromFile(event, '${key}')">
         </label>
         <img src="${url}" style="width:70px;height:40px;object-fit:cover;border-radius:4px;border:1px solid var(--border)">
@@ -672,7 +777,7 @@ async function adminPublishAnnouncement() {
   const t = document.getElementById('adminAnnounceInput').value.trim();
   if (!t) return;
   await firestore.collection('settings').doc('global').set({ announce: t }, { merge: true });
-  alert('Annonce publiée instantanément pour tous les joueurs ! 📢');
+  alert('Annonce publiée ! 📢');
 }
 
 async function changeTheme(c) {
@@ -683,15 +788,17 @@ async function changeTheme(c) {
 function filterLeague(l) {
   currentLeague = l;
   applyTheme();
-
   const matchesTitle = document.getElementById('matchesSectionTitle');
-  if (l === 'all') {
-    matchesTitle.textContent = "⚽ Calendrier Complet 2026-27";
-  } else if (LEAGUE_INFO[l]) {
-    matchesTitle.textContent = `${LEAGUE_INFO[l].flag} Calendrier ${LEAGUE_INFO[l].name}`;
-  }
-
+  if (l === 'all') matchesTitle.textContent = "⚽ Calendrier 2026-27";
+  else if (LEAGUE_INFO[l]) matchesTitle.textContent = `${LEAGUE_INFO[l].flag} Calendrier ${LEAGUE_INFO[l].name}`;
   document.querySelectorAll('#page-matches .league-tab').forEach(t => t.classList.remove('active'));
+  if (event && event.target) event.target.classList.add('active');
+  renderMatches();
+}
+
+function filterByMonth(m) {
+  currentMonth = m;
+  document.querySelectorAll('#monthFilterBar .matchday-pill').forEach(b => b.classList.remove('active'));
   if (event && event.target) event.target.classList.add('active');
   renderMatches();
 }
@@ -701,7 +808,6 @@ function navigateTo(p) {
     currentLeague = 'all';
     applyTheme();
   }
-
   document.querySelectorAll('.page-section').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.bottom-nav-item').forEach(b => b.classList.remove('active'));
   const page = document.getElementById('page-' + p);
@@ -710,6 +816,7 @@ function navigateTo(p) {
   if (btn) btn.classList.add('active');
   if (p === 'admin') { renderAdminMatchList(); renderAdminStats(); renderAdminLeagueBanners(); renderAdminLeagueBackgrounds(); }
   if (p === 'leaderboard') renderLeaderboard();
+  if (p === 'groups') renderGroups();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
