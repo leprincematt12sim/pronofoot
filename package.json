@@ -1,6 +1,6 @@
 ﻿{
   "name": "pronofoot",
   "version": "1.0.0",
-  "description": "Pronostics Football Europe",
-  "main": "index.html"
+  "description": "Pronostics Football Europe 2026-27",
+  "private": true
 }
