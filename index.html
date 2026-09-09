@@ -11,12 +11,15 @@
 </head>
 <body>
 
-  <!-- CONNEXION / INSCRIPTION SÉCURISÉE (AUCUN ACCÈS ADMIN EN UN CLIC) -->
+  <!-- ELEMENT AUDIO CACHÉ DU SITE -->
+  <audio id="siteAudioPlayer" loop></audio>
+
+  <!-- CONNEXION / INSCRIPTION -->
   <div class="auth-overlay" id="authScreen" style="display:none">
     <div class="auth-card">
       <div class="auth-header">
         <h1>⚽ PronoFoot</h1>
-        <p>Saison 2026-27 — Pronostics entre Amis</p>
+        <p>Saison 2026-27 — Multijoueur en Direct</p>
       </div>
 
       <div class="auth-tabs">
@@ -26,14 +29,12 @@
 
       <div id="authError" style="color:var(--accent);font-size:0.85rem;margin-bottom:12px;display:none"></div>
 
-      <!-- Formulaire Connexion -->
       <form id="loginForm" onsubmit="handleLogin(event)">
         <div class="form-group"><label>📧 Adresse Email</label><input type="email" id="loginEmail" placeholder="ton@email.com" required></div>
         <div class="form-group"><label>🔒 Mot de passe</label><input type="password" id="loginPass" placeholder="••••••••" required></div>
         <button type="submit" class="btn btn-primary" style="width:100%;margin-top:10px" id="loginBtn">Se connecter →</button>
       </form>
 
-      <!-- Formulaire Inscription -->
       <form id="registerForm" style="display:none" onsubmit="handleRegister(event)">
         <div class="form-group"><label>👤 Pseudo de joueur</label><input type="text" id="regUser" placeholder="Ex: Mathis_92" required minlength="3"></div>
         <div class="form-group"><label>📧 Adresse Email</label><input type="email" id="regEmail" placeholder="ton@email.com" required></div>
@@ -47,6 +48,13 @@
   <div id="appContainer">
     <nav class="top-nav">
       <div class="nav-brand" onclick="navigateTo('dashboard')">⚽ PronoFoot</div>
+      
+      <!-- WIDGET MUSIQUE DANS LA BARRE DU HAUT -->
+      <div class="music-widget" onclick="toggleSiteMusic()" title="Cliquer pour jouer / mettre en pause la musique">
+        <span id="musicStatusIcon">🎵</span>
+        <span class="music-title" id="musicTitleDisplay">Musique Off</span>
+      </div>
+
       <div class="nav-user">
         <button class="nav-admin-badge" id="topAdminBtn" onclick="navigateTo('admin')" style="display:none">⚙️ Admin</button>
         <div class="nav-points" id="navPoints">⭐ 0 pts</div>
@@ -253,10 +261,26 @@
         </div>
       </div>
 
-      <!-- 9. ADMIN (ACCÈS STRICTEMENT PRIVÉ ET SÉCURISÉ) -->
+      <!-- 9. ADMIN (AVEC CHARGEMENT DE FICHIER MP3 DEPUIS PC) -->
       <div class="page-section" id="page-admin">
         <h3 class="league-title-special" style="margin-bottom:15px">⚙️ Panneau Administrateur</h3>
-        
+
+        <!-- BLOC GESTION MUSIQUE MP3 DU SITE -->
+        <div class="admin-card" style="border:2px solid var(--gold)">
+          <h4 style="color:var(--gold)">🎵 Musique de Fond du Site (Fichier MP3)</h4>
+          <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:12px">
+            Chargez un morceau MP3 depuis votre ordinateur pour que vos joueurs puissent l'écouter en naviguant sur le site :
+          </p>
+
+          <div class="form-group">
+            <label style="background:var(--accent);color:white;padding:12px;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-size:0.85rem;font-weight:bold;width:100%;justify-content:center">
+              🎵 Choisir un fichier MP3 sur mon PC
+              <input type="file" accept="audio/mp3,audio/*" style="display:none" onchange="uploadAudioFromFile(event)">
+            </label>
+          </div>
+          <p id="audioFileNameDisplay" style="font-size:0.8rem;color:var(--green);font-weight:bold"></p>
+        </div>
+
         <div class="admin-card" style="border:2px solid var(--gold)">
           <h4 style="color:var(--gold)">⚡ Synchronization Automatique API Sports</h4>
           <div class="form-group" style="margin-bottom:10px">
@@ -313,13 +337,12 @@
 
     </div>
 
-    <!-- FOOTER SANS RACCOURCI ADMIN PUBLIC -->
     <div class="site-footer">
       <p>⚽ PronoFoot — Compétition Européenne 2026-27</p>
       <p style="margin-top:6px">
         <a onclick="navigateTo('rules')">📜 Règles</a> · 
         <a onclick="navigateTo('chat')">💬 Chat Général</a> · 
-        <a onclick="navigateTo('legal')">🔒 Confidentialité</a>
+        <a onclick="quickAdminLogin()" style="color:var(--gold)">⭐ Espace Admin</a>
       </p>
     </div>
   </div>
