@@ -71,7 +71,17 @@ let appState = {
     { id:'u3', username:'Marco_SerieA', email:'marco@test.com', pass:'123456', role:'user', points:31, preds:generateDemoPredictions(), bonuses:{}, groups:[], avatar:null }
   ],
   scores: JSON.parse(localStorage.getItem('pf_scores_v3')) || {},
-  groups: JSON.parse(localStorage.getItem('pf_groups_v3')) || [],
+  groups: JSON.parse(localStorage.getItem('pf_groups_v3')) || [
+    {
+      id: 'grp_demo',
+      name: '⚽ Ligue des Amis VIP 2026-27',
+      code: 'FOOT26',
+      createdBy: 'admin',
+      creatorName: 'Admin',
+      members: ['admin', 'u1', 'u2', 'u3'],
+      createdAt: new Date().toISOString()
+    }
+  ],
   globalChat: JSON.parse(localStorage.getItem('pf_global_chat')) || [
     { senderName: "Alex_PL", text: "Salut à tous les supporters ! Prêts pour la saison ?", time: "12:00" },
     { senderName: "Sophie_L1", text: "Allez Paris SG cette saison !", time: "12:05" }
@@ -96,7 +106,6 @@ function getTeamCrest(name) {
   return TEAM_CRESTS[name] || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=16213e&color=fff&size=64&bold=true`;
 }
 
-// Fonction de compression d'image globale
 function compressAndReadFile(file, maxWidth, callback) {
   const reader = new FileReader();
   reader.onload = function(e) {
@@ -121,27 +130,20 @@ function compressAndReadFile(file, maxWidth, callback) {
   reader.readAsDataURL(file);
 }
 
-// TÉLÉCHARGER PHOTO DE PROFIL
 async function uploadUserAvatar(event) {
   const file = event.target.files[0];
   if (!file || !currentUser) return;
 
   compressAndReadFile(file, 200, async function(dataUrl) {
     currentUser.avatar = dataUrl;
-    
-    // Mettre à jour l'état local
     const idx = appState.users.findIndex(u => u.id === currentUser.id);
     if (idx !== -1) appState.users[idx].avatar = dataUrl;
     localStorage.setItem('pf_local_users', JSON.stringify(appState.users));
     localStorage.setItem('pf_cloud_session', JSON.stringify(currentUser));
     
-    // Mettre à jour Firestore
     if (firestore) {
-      try {
-        await firestore.collection('users').doc(currentUser.id).update({ avatar: dataUrl });
-      } catch (err) {}
+      try { await firestore.collection('users').doc(currentUser.id).update({ avatar: dataUrl }); } catch (err) {}
     }
-    
     updateUI();
     renderLeaderboard();
     renderDashboardLeaderboard();
@@ -198,6 +200,16 @@ function listenCloudData() {
           renderAdminStats();
         }
       }
+    });
+
+    firestore.collection('groups').onSnapshot(snap => {
+      const cloudGroups = [];
+      snap.forEach(d => cloudGroups.push({ id: d.id, ...d.data() }));
+      if (cloudGroups.length > 0) {
+        appState.groups = cloudGroups;
+        localStorage.setItem('pf_groups_v3', JSON.stringify(appState.groups));
+      }
+      renderGroups();
     });
   } catch (err) {}
 }
@@ -413,11 +425,12 @@ function handleLogout() {
 }
 
 function getAvatarHtml(u, sizePx = 32, fontSize = 0.8) {
-  if (u.avatar) {
+  if (u && u.avatar) {
     return `<div style="width:${sizePx}px;height:${sizePx}px;border-radius:50%;background-image:url('${u.avatar}');background-size:cover;background-position:center;border:1px solid var(--border);flex-shrink:0"></div>`;
   }
-  const color = getAvatarColor(u.username);
-  return `<div style="width:${sizePx}px;height:${sizePx}px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:${fontSize}rem;flex-shrink:0;color:white;border:1px solid var(--border)">${(u.username||'A')[0].toUpperCase()}</div>`;
+  const name = (u && u.username) ? u.username : 'A';
+  const color = getAvatarColor(name);
+  return `<div style="width:${sizePx}px;height:${sizePx}px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:${fontSize}rem;flex-shrink:0;color:white;border:1px solid var(--border)">${name[0].toUpperCase()}</div>`;
 }
 
 function updateUI() {
@@ -541,8 +554,6 @@ function renderGlobalChat() {
   let html = '';
   appState.globalChat.forEach(m => {
     const isMine = currentUser && m.senderName === currentUser.username;
-    
-    // Trouver l'utilisateur pour afficher sa photo (ou une couleur par défaut)
     const senderUser = appState.users.find(u => u.username === m.senderName) || { username: m.senderName };
     const avatarHtml = getAvatarHtml(senderUser, 24, 0.7);
 
@@ -557,7 +568,7 @@ function renderGlobalChat() {
       </div>`;
   });
 
-  box.innerHTML = html || '<p style="text-align:center;color:var(--text-muted);font-size:0.85rem">Aucun message pour le moment. Soyez le premier !</p>';
+  box.innerHTML = html || '<p style="text-align:center;color:var(--text-muted);font-size:0.85rem">Aucun message. Soyez le premier !</p>';
   box.scrollTop = box.scrollHeight;
 }
 
@@ -681,7 +692,7 @@ function renderMatches() {
   container.innerHTML = html;
 }
 
-// === GROUPES PRIVÉS ===
+// === GROUPES PRIVÉS & INVITATION WHATSAPP ===
 async function showCreateGroupPrompt() {
   const name = prompt("Nom de votre Groupe Privé (ex: Les Potes du Foot) :");
   if (!name || !name.trim()) return;
@@ -691,9 +702,9 @@ async function showCreateGroupPrompt() {
     id: 'grp_' + Date.now(),
     name: name.trim(),
     code: code,
-    createdBy: currentUser.id,
-    creatorName: currentUser.username,
-    members: [currentUser.id],
+    createdBy: currentUser ? currentUser.id : 'admin',
+    creatorName: currentUser ? currentUser.username : 'Admin',
+    members: currentUser ? [currentUser.id] : ['admin'],
     createdAt: new Date().toISOString()
   };
 
@@ -708,24 +719,23 @@ async function showCreateGroupPrompt() {
   localStorage.setItem('pf_groups_v3', JSON.stringify(appState.groups));
   renderGroups();
   
-  // Outil d'invitation WhatsApp intégré
   const inviteText = `Salut ! Rejoins mon groupe "${name}" sur PronoFoot pour la saison 2026-27 !\n\n1. Va sur le site\n2. Clique sur "Groupes" > "Rejoindre avec un Code"\n3. Tape ce code : ${code}`;
   const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(inviteText)}`;
   
-  if (confirm(`✅ Groupe "${name}" créé avec succès !\nCode d'invitation : ${code}\n\nVoulez-vous envoyer une invitation à vos amis sur WhatsApp ?`)) {
+  if (confirm(`✅ Groupe "${name}" créé !\nCode d'invitation : ${code}\n\nVoulez-vous inviter vos amis sur WhatsApp ?`)) {
     window.open(whatsappUrl, '_blank');
   }
 }
 
 async function showJoinGroupPrompt() {
-  const code = prompt("Entrez le code du groupe (ex: GRP-ABCD) :");
+  const code = prompt("Entrez le code du groupe (ex: GRP-ABCD ou FOOT26) :");
   if (!code || !code.trim()) return;
 
   const cleanCode = code.trim().toUpperCase();
   const localGroup = appState.groups.find(g => g.code === cleanCode);
 
   if (localGroup) {
-    if (!localGroup.members.includes(currentUser.id)) {
+    if (currentUser && !localGroup.members.includes(currentUser.id)) {
       localGroup.members.push(currentUser.id);
       localStorage.setItem('pf_groups_v3', JSON.stringify(appState.groups));
     }
@@ -739,51 +749,58 @@ async function showJoinGroupPrompt() {
       const query = await firestore.collection('groups').where('code', '==', cleanCode).get();
       if (!query.empty) {
         const groupDoc = query.docs[0];
-        await firestore.collection('groups').doc(groupDoc.id).update({
-          members: firebase.firestore.FieldValue.arrayUnion(currentUser.id)
-        });
+        if (currentUser) {
+          await firestore.collection('groups').doc(groupDoc.id).update({
+            members: firebase.firestore.FieldValue.arrayUnion(currentUser.id)
+          });
+        }
         alert(`🎉 Vous avez rejoint le groupe "${groupDoc.data().name}" !`);
         return;
       }
     } catch (e) {}
   }
 
-  alert("❌ Code de groupe introuvable.");
+  alert("❌ Code invalide.");
 }
 
-// Fonction de partage WhatsApp direct
 function shareGroupWhatsApp(code, name) {
-  const inviteText = `Salut ! Rejoins ma ligue "${name}" sur PronoFoot pour la saison 2026-27 !\n\n1. Va sur le site\n2. Va dans l'onglet "Groupes" > "Rejoindre avec un Code"\n3. Entre mon code secret : ${code}`;
+  const inviteText = `Salut ! Rejoins ma ligue "${name}" sur PronoFoot 2026-27 !\n\n1. Va sur le site\n2. Clique sur l'onglet "Groupes" > "Rejoindre avec un Code"\n3. Tape ce code secret : ${code}`;
   window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(inviteText)}`, '_blank');
 }
 
 function renderGroups() {
   const container = document.getElementById('groupsListContainer');
-  if (!currentUser || !container) return;
+  if (!container) return;
 
-  const myGroups = appState.groups.filter(g => g.members && g.members.includes(currentUser.id));
+  // Si pas de groupe créé par l'utilisateur, afficher tous les groupes auxquels il appartient (ou le groupe exemple)
+  let myGroups = [];
+  if (currentUser) {
+    myGroups = appState.groups.filter(g => g.members && g.members.includes(currentUser.id));
+  }
+  
+  if (myGroups.length === 0) {
+    myGroups = appState.groups; // Afficher tous les groupes disponibles si aucun spécifique
+  }
 
   if (myGroups.length === 0) {
-    container.innerHTML = '<div class="rules-box"><p style="text-align:center">Vous ne faites partie d\'aucun groupe privé pour l\'instant.<br>Créez-en un ou rejoignez vos amis avec leur code !</p></div>';
-    document.getElementById('groupChatSection').style.display = 'none';
+    container.innerHTML = '<div class="rules-box"><p style="text-align:center">Aucun groupe privé. Créez-en un en cliquat sur le bouton ci-dessus !</p></div>';
     return;
   }
 
   let html = '';
   myGroups.forEach(g => {
-    const groupUsers = appState.users.filter(u => g.members.includes(u.id)).sort((a,b) => b.points - a.points);
+    const groupUsers = appState.users.filter(u => g.members && g.members.includes(u.id)).sort((a,b) => b.points - a.points);
 
     html += `
       <div class="group-card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
           <div>
             <h3 style="color:var(--accent);margin-bottom:2px">${g.name}</h3>
-            <span style="font-size:0.8rem;color:var(--text-muted)">Créé par ${g.creatorName} · ${groupUsers.length} joueur(s)</span>
+            <span style="font-size:0.8rem;color:var(--text-muted)">Créé par ${g.creatorName} · ${groupUsers.length} membre(s)</span>
           </div>
           <div style="display:flex;align-items:center;gap:6px">
             <span class="group-code-badge">${g.code}</span>
-            <button class="btn btn-green btn-xs" style="background:#25D366;color:white;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;font-weight:bold" onclick="shareGroupWhatsApp('${g.code}', '${g.name.replace(/'/g, "\\'")}')">💬 Inviter sur WhatsApp</button>
-            <button class="btn btn-secondary btn-xs" onclick="openGroupChat('${g.id}', '${g.name.replace(/'/g, "\\'")}')">💬 Chat Privé</button>
+            <button class="btn btn-sm" style="background:#25D366;color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:bold" onclick="shareGroupWhatsApp('${g.code}', '${g.name.replace(/'/g, "\\'")}')">💬 Inviter WhatsApp</button>
           </div>
         </div>
 
@@ -791,12 +808,12 @@ function renderGroups() {
           <thead><tr><th>#</th><th>Membre</th><th>Pronos</th><th>Points</th></tr></thead>
           <tbody>
             ${groupUsers.map((u, i) => `
-              <tr class="${u.id===currentUser.id?'current-user':''}">
+              <tr class="${currentUser && u.id===currentUser.id?'current-user':''}">
                 <td>${i===0?'🥇':i===1?'🥈':i===2?'🥉':'#'+(i+1)}</td>
                 <td>
                   <div style="display:flex;align-items:center;gap:6px">
                     ${getAvatarHtml(u, 24, 0.6)}
-                    <strong>${u.username}</strong> ${u.id===currentUser.id?'(toi)':''}
+                    <strong>${u.username}</strong> ${currentUser && u.id===currentUser.id?'(toi)':''}
                   </div>
                 </td>
                 <td>${Object.keys(u.preds||{}).length}</td>
@@ -816,38 +833,6 @@ function openGroupChat(groupId, groupName) {
   document.getElementById('groupChatSection').style.display = 'block';
   document.getElementById('chatGroupName').textContent = groupName;
   document.getElementById('groupChatSection').scrollIntoView({ behavior: 'smooth' });
-
-  if (activeGroupChatUnsubscribe) activeGroupChatUnsubscribe();
-
-  if (firestore) {
-    try {
-      activeGroupChatUnsubscribe = firestore.collection('groups').doc(groupId).collection('messages')
-        .orderBy('timestamp', 'asc')
-        .limitToLast(40)
-        .onSnapshot(snap => {
-          const box = document.getElementById('chatMessagesBox');
-          let chatHtml = '';
-          snap.forEach(d => {
-            const m = d.data();
-            const isMine = m.senderId === currentUser.id;
-            const senderUser = appState.users.find(u => u.username === m.senderName) || { username: m.senderName };
-            const avatarHtml = getAvatarHtml(senderUser, 20, 0.5);
-
-            chatHtml += `
-              <div class="chat-msg ${isMine?'mine':''}" style="display:flex;gap:6px">
-                ${!isMine ? avatarHtml : ''}
-                <div style="flex:1">
-                  <div class="sender">${isMine ? 'Moi' : m.senderName}</div>
-                  <div>${m.text}</div>
-                </div>
-                ${isMine ? avatarHtml : ''}
-              </div>`;
-          });
-          box.innerHTML = chatHtml || '<p style="text-align:center;color:var(--text-muted);font-size:0.8rem">Aucun message pour l\'instant. Soyez le premier !</p>';
-          box.scrollTop = box.scrollHeight;
-        });
-    } catch (e) {}
-  }
 }
 
 async function handleSendChatMessage(e) {
@@ -1046,11 +1031,67 @@ function renderAdminStats() {
     <div style="display:flex;justify-content:space-between;padding:6px 0"><span>Pronostics totaux</span><strong style="color:var(--gold)">${p}</strong></div>`;
 }
 
+function renderAdminLeagueBackgrounds() {
+  const container = document.getElementById('adminLeagueBackgrounds');
+  if (!container) return;
+  let html = '';
+  for (const [key, li] of Object.entries(LEAGUE_INFO)) {
+    const url = (appState.settings.leagueBackgrounds && appState.settings.leagueBackgrounds[key]) || li.defaultBg;
+    html += `
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);flex-wrap:wrap">
+        <span style="min-width:140px;font-weight:600">${li.flag} ${li.name}</span>
+        <label style="background:var(--accent);color:white;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:bold">
+          📁 Fond PC
+          <input type="file" accept="image/*" style="display:none" onchange="uploadLeagueBgFromFile(event, '${key}')">
+        </label>
+        <img src="${url}" style="width:70px;height:40px;object-fit:cover;border-radius:4px;border:1px solid var(--border)">
+      </div>`;
+  }
+  container.innerHTML = html;
+}
+
+function renderAdminLeagueBanners() {
+  const container = document.getElementById('adminLeagueBanners');
+  if (!container) return;
+  let html = '';
+  for (const [key, li] of Object.entries(LEAGUE_INFO)) {
+    const url = (appState.settings.leagueBanners && appState.settings.leagueBanners[key]) || li.defaultBanner;
+    html += `
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);flex-wrap:wrap">
+        <span style="min-width:140px;font-weight:600">${li.flag} ${li.name}</span>
+        <label style="background:var(--accent);color:white;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:bold">
+          📁 Bannière PC
+          <input type="file" accept="image/*" style="display:none" onchange="uploadBannerFromFile(event, '${key}')">
+        </label>
+        <img src="${url}" style="width:70px;height:40px;object-fit:cover;border-radius:4px;border:1px solid var(--border)">
+      </div>`;
+  }
+  container.innerHTML = html;
+}
+
+async function adminPublishAnnouncement() {
+  const t = document.getElementById('adminAnnounceInput').value.trim();
+  if (!t) return;
+  appState.settings.announce = t;
+  if (firestore) {
+    try { await firestore.collection('settings').doc('global').set({ announce: t }, { merge: true }); } catch (e) {}
+  }
+  alert('Annonce publiée ! 📢');
+}
+
+async function changeTheme(c) {
+  appState.settings.themeColor = c;
+  if (firestore) {
+    try { await firestore.collection('settings').doc('global').set({ themeColor: c }, { merge: true }); } catch (e) {}
+  }
+  applyTheme();
+}
+
 function filterLeague(l) {
   currentLeague = l;
   applyTheme();
   const matchesTitle = document.getElementById('matchesSectionTitle');
-  if (l === 'all') matchesTitle.textContent = "⚽ Calendrier Complet 2026-27";
+  if (l === 'all') matchesTitle.textContent = "⚽ Calendrier 2026-27";
   else if (LEAGUE_INFO[l]) matchesTitle.textContent = `${LEAGUE_INFO[l].flag} Calendrier ${LEAGUE_INFO[l].name}`;
   document.querySelectorAll('#page-matches .league-tab').forEach(t => t.classList.remove('active'));
   if (event && event.target) event.target.classList.add('active');
@@ -1075,7 +1116,7 @@ function navigateTo(p) {
   if (page) page.classList.add('active');
   const btn = document.querySelector(`[onclick="navigateTo('${p}')"]`);
   if (btn) btn.classList.add('active');
-  if (p === 'admin') { renderAdminMatchList(); renderAdminStats(); }
+  if (p === 'admin') { renderAdminMatchList(); renderAdminStats(); renderAdminLeagueBanners(); renderAdminLeagueBackgrounds(); }
   if (p === 'leaderboard') renderLeaderboard();
   if (p === 'groups') renderGroups();
   if (p === 'chat') renderGlobalChat();

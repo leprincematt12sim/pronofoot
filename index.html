@@ -53,12 +53,13 @@
       </div>
     </nav>
 
-    <!-- NAVBAR DU BAS -->
+    <!-- NAVBAR DU BAS AVEC ONGLET GROUPES BIEN VISIBLE -->
     <nav class="bottom-nav">
       <button class="bottom-nav-item active" onclick="navigateTo('dashboard')"><span>🏠</span><span>Accueil</span></button>
       <button class="bottom-nav-item" onclick="navigateTo('matches')"><span>⚽</span><span>Matchs</span></button>
-      <button class="bottom-nav-item" onclick="navigateTo('leaderboard')"><span>🏆</span><span>Classement</span></button>
-      <button class="bottom-nav-item" onclick="navigateTo('chat')"><span>💬</span><span>Chat & Fun</span></button>
+      <button class="bottom-nav-item" onclick="navigateTo('leaderboard')"><span>🏆</span><span>Général</span></button>
+      <button class="bottom-nav-item" onclick="navigateTo('groups')"><span>👥</span><span>Groupes</span></button>
+      <button class="bottom-nav-item" onclick="navigateTo('chat')"><span>💬</span><span>Chat</span></button>
       <button class="bottom-nav-item" onclick="navigateTo('admin')" id="adminNavBtn" style="display:none"><span>⚙️</span><span>Admin</span></button>
     </nav>
 
@@ -84,7 +85,7 @@
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px">
           <button class="btn btn-primary" onclick="navigateTo('matches')">⚽ Pronostiquer les matchs</button>
-          <button class="btn btn-gold" onclick="navigateTo('chat')">💬 Aller au Chat Général</button>
+          <button class="btn btn-gold" onclick="navigateTo('groups')">👥 Mes Groupes Privés</button>
         </div>
 
         <h3 style="margin-bottom:12px">🏆 Top 5 Général (Saison 2026-27)</h3>
@@ -127,7 +128,7 @@
         <div id="matchesContainer"></div>
       </div>
 
-      <!-- 3. CLASSEMENT -->
+      <!-- 3. CLASSEMENT GLOBAL -->
       <div class="page-section" id="page-leaderboard">
         <h3 style="margin-bottom:5px" class="league-title-special">🏆 Classement Général Cloud</h3>
         <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:20px">Synchronisation instantanée dès qu'un score est validé.</p>
@@ -135,12 +136,33 @@
         <div id="leaderboardContainer"></div>
       </div>
 
-      <!-- 4. CHAT GÉNÉRAL & DIVERTISSEMENT -->
+      <!-- 4. GROUPES PRIVÉS ET LIGAS FERMÉES (ACCÈS DIRECT) -->
+      <div class="page-section" id="page-groups">
+        <h3 style="margin-bottom:5px" class="league-title-special">👥 Mes Groupes Privés & Ligas Fermées</h3>
+        <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:20px">Créez votre ligue privée (style Kicktipp) ou rejoignez vos amis avec leur code !</p>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
+          <button class="btn btn-primary" onclick="showCreateGroupPrompt()">➕ Créer un Groupe Privé</button>
+          <button class="btn btn-gold" onclick="showJoinGroupPrompt()">🔑 Rejoindre avec un Code</button>
+        </div>
+
+        <div id="groupsListContainer"></div>
+
+        <div id="groupChatSection" style="display:none;margin-top:25px">
+          <h4 style="color:var(--gold);margin-bottom:8px">💬 Chat Privé du Groupe (<span id="chatGroupName"></span>)</h4>
+          <div class="chat-box" id="chatMessagesBox"></div>
+          <form onsubmit="handleSendChatMessage(event)" style="display:flex;gap:8px">
+            <input type="text" id="chatInputText" placeholder="Message au groupe..." style="flex:1;padding:10px;background:var(--bg-dark);border:1px solid var(--border);border-radius:6px;color:white" required>
+            <button type="submit" class="btn btn-primary btn-sm">Envoyer 🚀</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- 5. CHAT GÉNÉRAL -->
       <div class="page-section" id="page-chat">
         <h3 class="league-title-special" style="margin-bottom:5px">💬 Le Salon des Supporters</h3>
         <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:15px">Discutez en direct avec tous les joueurs de la communauté !</p>
 
-        <!-- CHAT BOX GLOBAL -->
         <div class="chat-container">
           <div class="chat-box" id="globalChatMessagesBox">
             <p style="text-align:center;color:var(--text-muted);font-size:0.85rem">Chargement des messages en direct...</p>
@@ -152,7 +174,6 @@
           </form>
         </div>
 
-        <!-- SONDAGE DU JOUR -->
         <div class="poll-card">
           <h4 style="color:var(--gold);margin-bottom:8px">📊 Sondage de la Communauté</h4>
           <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:12px">Qui va remporter la Ligue des Champions 2026-27 ?</p>
@@ -172,32 +193,6 @@
             <span style="position:relative">🩵 Manchester City</span>
             <span style="position:relative" id="count_mancity">25%</span>
           </div>
-        </div>
-
-        <div style="margin-top:20px;text-align:center">
-          <button class="btn btn-secondary btn-sm" onclick="navigateTo('groups')">👥 Voir mes Groupes Privés & Ligas fermées →</button>
-        </div>
-      </div>
-
-      <!-- 5. GROUPES PRIVÉS -->
-      <div class="page-section" id="page-groups">
-        <h3 style="margin-bottom:5px" class="league-title-special">👥 Groupes Privés & Ligas Fermées</h3>
-        <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:20px">Créez votre propre ligue fermée et invitez vos amis par WhatsApp !</p>
-
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
-          <button class="btn btn-primary" onclick="showCreateGroupPrompt()">➕ Créer un Groupe</button>
-          <button class="btn btn-gold" onclick="showJoinGroupPrompt()">🔑 Rejoindre avec un Code</button>
-        </div>
-
-        <div id="groupsListContainer"></div>
-
-        <div id="groupChatSection" style="display:none;margin-top:25px">
-          <h4 style="color:var(--gold);margin-bottom:8px">💬 Chat Privé du Groupe (<span id="chatGroupName"></span>)</h4>
-          <div class="chat-box" id="chatMessagesBox"></div>
-          <form onsubmit="handleSendChatMessage(event)" style="display:flex;gap:8px">
-            <input type="text" id="chatInputText" placeholder="Message..." style="flex:1;padding:10px;background:var(--bg-dark);border:1px solid var(--border);border-radius:6px;color:white" required>
-            <button type="submit" class="btn btn-primary btn-sm">Envoyer 🚀</button>
-          </form>
         </div>
       </div>
 
@@ -221,12 +216,10 @@
         </div>
       </div>
 
-      <!-- 8. PROFIL (NOUVEAU AVEC PHOTO) -->
+      <!-- 8. PROFIL -->
       <div class="page-section" id="page-profile">
         <h3 style="margin-bottom:15px" class="league-title-special">👤 Mon Profil</h3>
         <div class="admin-card" style="text-align:center;max-width:400px;margin:0 auto">
-          
-          <!-- L'AVATAR CLIQUABLE POUR CHANGER LA PHOTO -->
           <label style="cursor:pointer;display:block;margin:0 auto 12px;width:100px;height:100px;border-radius:50%;position:relative" title="Cliquez pour changer votre photo">
             <div class="profile-avatar-large" id="profileBigAvatar">?</div>
             <div class="profile-avatar-overlay" style="position:absolute;inset:0;background:rgba(0,0,0,0.5);border-radius:50%;display:flex;align-items:center;justify-content:center;opacity:0;transition:0.2s">
@@ -238,11 +231,6 @@
           <h2 id="profileUsername">-</h2>
           <p id="profileEmail" style="color:var(--text-muted);font-size:0.85rem;margin-bottom:8px">-</p>
           <p id="profileRole" style="color:var(--gold);font-size:0.85rem;font-weight:bold;margin-bottom:20px"></p>
-          
-          <div class="badges-grid" style="margin-bottom:20px;border-top:1px solid var(--border);padding-top:15px">
-            <div class="badge-item"><div class="badge-icon">⚽</div><div class="badge-title">Inscrit</div></div>
-            <div class="badge-item"><div class="badge-icon" id="badgeProno">🎯</div><div class="badge-title">Pronostiqueur</div></div>
-          </div>
 
           <button class="btn btn-secondary" style="width:100%" onclick="handleLogout()">🚪 Se Déconnecter</button>
         </div>
@@ -287,6 +275,11 @@
             <h4>📢 Annonce</h4>
             <div class="form-group"><input type="text" id="adminAnnounceInput" placeholder="Message général..."></div>
             <button class="btn btn-gold btn-sm" style="width:100%" onclick="adminPublishAnnouncement()">Publier</button>
+          </div>
+
+          <div class="admin-card">
+            <h4>📊 Statistiques Cloud</h4>
+            <div id="adminStats"></div>
           </div>
         </div>
       </div>
