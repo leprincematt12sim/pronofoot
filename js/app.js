@@ -13,6 +13,8 @@ try {
   firestore = firebase.firestore();
 } catch (e) {}
 
+const REAL_API_KEY = "5eb745d2e42b3f1e72fddff81191592e";
+
 const TEAM_CRESTS = {
   "Arsenal": "https://media.api-sports.io/football/teams/42.png",
   "Manchester City": "https://media.api-sports.io/football/teams/50.png",
@@ -71,7 +73,17 @@ let appState = {
     { id:'u3', username:'Marco_SerieA', email:'marco@test.com', pass:'123456', role:'user', points:31, preds:generateDemoPredictions(), bonuses:{}, groups:[], avatar:null }
   ],
   scores: JSON.parse(localStorage.getItem('pf_scores_v3')) || {},
-  groups: JSON.parse(localStorage.getItem('pf_groups_v3')) || [],
+  groups: JSON.parse(localStorage.getItem('pf_groups_v3')) || [
+    {
+      id: 'grp_demo',
+      name: '⚽ Ligue des Amis VIP 2026-27',
+      code: 'FOOT26',
+      createdBy: 'admin',
+      creatorName: 'Admin',
+      members: ['admin', 'u1', 'u2', 'u3'],
+      createdAt: new Date().toISOString()
+    }
+  ],
   globalChat: JSON.parse(localStorage.getItem('pf_global_chat')) || [],
   pollVotes: { real: 45, psg: 30, mancity: 25 },
   settings: {
@@ -80,70 +92,100 @@ let appState = {
     leagueBanners: {},
     leagueBackgrounds: {},
     themeColor: '#e94560',
-    apiKey: localStorage.getItem('pf_api_key') || ''
+    apiKey: REAL_API_KEY
   }
 };
 
 let currentUser = JSON.parse(localStorage.getItem('pf_cloud_session')) || null;
 let currentLeague = 'all';
 let currentMonth = 'all';
+let activeGroup = null;
 
 function getTeamCrest(name) {
   return TEAM_CRESTS[name] || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=16213e&color=fff&size=64&bold=true`;
 }
 
-// FONCTION DE SYNCHRO API-SPORTS AUTOMATIQUE
-async function saveAndSyncApiSports() {
-  const apiKey = document.getElementById('adminApiKeyInput').value.trim();
-  const statusEl = document.getElementById('apiSyncStatus');
-
-  if (!apiKey) {
-    alert("Veuillez coller votre clé API-Sports !");
-    return;
-  }
-
-  statusEl.textContent = "⏳ Synchro en cours avec API-Sports...";
-  appState.settings.apiKey = apiKey;
-  localStorage.setItem('pf_api_key', apiKey);
-
+// SYNCHRONISATION AUTOMATIQUE EN DIRECT AVEC L'API SPORTS
+async function fetchLiveScoresFromAPI() {
+  const apiKey = REAL_API_KEY;
   try {
-    // Appel direct à l'API-Football pour récupérer les matchs du jour
-    const response = await fetch(`https://v3.football.api-sports.io/fixtures?date=${new Date().toISOString().split('T')[0]}`, {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const res = await fetch(`https://v3.football.api-sports.io/fixtures?date=${todayStr}`, {
       method: "GET",
-      headers: {
-        "x-apisports-key": apiKey
-      }
+      headers: { "x-apisports-key": apiKey }
     });
 
-    const data = await response.json();
+    const data = await res.json();
     const fixtures = data.response || [];
-    let updatedCount = 0;
+    let updated = 0;
 
     fixtures.forEach(f => {
       if (['FT', 'AET', 'PEN'].includes(f.fixture.status.short)) {
-        const homeName = f.teams.home.name;
-        const awayName = f.teams.away.name;
-        
-        // Trouver le match correspondant dans notre calendrier
+        const homeName = f.teams.home.name.toLowerCase();
+        const awayName = f.teams.away.name.toLowerCase();
+
         const match = ALL_MATCHES.find(m => 
-          m.home.toLowerCase().includes(homeName.toLowerCase()) || 
-          m.away.toLowerCase().includes(awayName.toLowerCase())
+          m.home.toLowerCase().includes(homeName) || m.away.toLowerCase().includes(awayName)
         );
 
-        if (match) {
+        if (match && !appState.scores[match.id]) {
           appState.scores[match.id] = { h: f.goals.home, a: f.goals.away };
-          updatedCount++;
+          updated++;
         }
       }
     });
 
-    // Enregistrer les nouveaux scores dans Firebase
+    if (updated > 0) {
+      localStorage.setItem('pf_scores_v3', JSON.stringify(appState.scores));
+      if (firestore) {
+        await firestore.collection('settings').doc('global').set({ scores: appState.scores }, { merge: true });
+      }
+      recalculateAllCloudPoints();
+      updateUI();
+      renderMatches();
+      renderLeaderboard();
+      renderDashboardLeaderboard();
+    }
+  } catch (e) {
+    console.log("Auto-synchro API passive:", e.message);
+  }
+}
+
+async function saveAndSyncApiSports() {
+  const apiKey = document.getElementById('adminApiKeyInput').value.trim() || REAL_API_KEY;
+  const statusEl = document.getElementById('apiSyncStatus');
+  statusEl.textContent = "⏳ Synchro en cours avec API-Sports...";
+
+  try {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const res = await fetch(`https://v3.football.api-sports.io/fixtures?date=${todayStr}`, {
+      method: "GET",
+      headers: { "x-apisports-key": apiKey }
+    });
+
+    const data = await res.json();
+    const fixtures = data.response || [];
+    let count = 0;
+
+    fixtures.forEach(f => {
+      if (['FT', 'AET', 'PEN'].includes(f.fixture.status.short)) {
+        const hName = f.teams.home.name.toLowerCase();
+        const aName = f.teams.away.name.toLowerCase();
+
+        const match = ALL_MATCHES.find(m => 
+          m.home.toLowerCase().includes(hName) || m.away.toLowerCase().includes(aName)
+        );
+
+        if (match) {
+          appState.scores[match.id] = { h: f.goals.home, a: f.goals.away };
+          count++;
+        }
+      }
+    });
+
     localStorage.setItem('pf_scores_v3', JSON.stringify(appState.scores));
     if (firestore) {
-      await firestore.collection('settings').doc('global').set({
-        scores: appState.scores,
-        apiKey: apiKey
-      }, { merge: true });
+      await firestore.collection('settings').doc('global').set({ scores: appState.scores }, { merge: true });
     }
 
     recalculateAllCloudPoints();
@@ -152,24 +194,58 @@ async function saveAndSyncApiSports() {
     renderLeaderboard();
     renderDashboardLeaderboard();
     renderAdminMatchList();
-    
-    statusEl.textContent = `✅ Synchro réussie ! ${updatedCount} score(s) réel(s) mis à jour.`;
-    alert(`⚡ Synchro terminée ! ${updatedCount} score(s) de match réel(s) synchronisé(s) et points recalculés !`);
+
+    statusEl.textContent = `✅ Synchro réussie ! ${count} score(s) mis à jour.`;
+    alert(`⚡ Synchro API-Sports terminée ! ${count} match(s) actualisé(s).`);
   } catch (err) {
-    statusEl.textContent = "❌ Erreur de connexion API-Sports : " + err.message;
+    statusEl.textContent = "❌ Erreur API : " + err.message;
     alert("Erreur API-Sports : " + err.message);
   }
 }
 
-function saveApiKeyOnly() {
-  const apiKey = document.getElementById('adminApiKeyInput').value.trim();
-  if (!apiKey) return;
-  appState.settings.apiKey = apiKey;
-  localStorage.setItem('pf_api_key', apiKey);
-  if (firestore) {
-    firestore.collection('settings').doc('global').set({ apiKey: apiKey }, { merge: true });
-  }
-  alert("Clé API sauvegardée avec succès ! 🔑");
+function compressAndReadFile(file, maxWidth, callback) {
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const img = new Image();
+    img.onload = function() {
+      const canvas = document.createElement('canvas');
+      let width = img.width;
+      let height = img.height;
+      if (width > maxWidth) {
+        height = Math.round((height * maxWidth) / width);
+        width = maxWidth;
+      }
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+      callback(dataUrl);
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function uploadUserAvatar(event) {
+  const file = event.target.files[0];
+  if (!file || !currentUser) return;
+
+  compressAndReadFile(file, 200, async function(dataUrl) {
+    currentUser.avatar = dataUrl;
+    const idx = appState.users.findIndex(u => u.id === currentUser.id);
+    if (idx !== -1) appState.users[idx].avatar = dataUrl;
+    localStorage.setItem('pf_local_users', JSON.stringify(appState.users));
+    localStorage.setItem('pf_cloud_session', JSON.stringify(currentUser));
+    
+    if (firestore) {
+      try { await firestore.collection('users').doc(currentUser.id).update({ avatar: dataUrl }); } catch (err) {}
+    }
+    updateUI();
+    renderLeaderboard();
+    renderDashboardLeaderboard();
+    alert('📸 Photo de profil mise à jour avec succès !');
+  });
 }
 
 function listenCloudData() {
@@ -206,9 +282,6 @@ function listenCloudData() {
         const data = doc.data();
         appState.scores = data.scores || {};
         appState.settings = { ...appState.settings, ...data };
-        if (appState.settings.apiKey) {
-          localStorage.setItem('pf_api_key', appState.settings.apiKey);
-        }
         applyTheme();
         if (appState.settings.announce) {
           document.getElementById('announcementBox').style.display = 'block';
@@ -224,6 +297,16 @@ function listenCloudData() {
           renderAdminStats();
         }
       }
+    });
+
+    firestore.collection('groups').onSnapshot(snap => {
+      const cloudGroups = [];
+      snap.forEach(d => cloudGroups.push({ id: d.id, ...d.data() }));
+      if (cloudGroups.length > 0) {
+        appState.groups = cloudGroups;
+        localStorage.setItem('pf_groups_v3', JSON.stringify(appState.groups));
+      }
+      renderGroups();
     });
   } catch (err) {}
 }
@@ -280,6 +363,7 @@ function applyTheme() {
 function init() {
   recalculateAllCloudPoints();
   listenCloudData();
+  fetchLiveScoresFromAPI();
 
   if (currentUser) {
     document.getElementById('authScreen').style.display = 'none';
@@ -305,7 +389,7 @@ function setupApp() {
     renderAdminMatchList();
     renderAdminStats();
     if (document.getElementById('adminApiKeyInput')) {
-      document.getElementById('adminApiKeyInput').value = appState.settings.apiKey || localStorage.getItem('pf_api_key') || '';
+      document.getElementById('adminApiKeyInput').value = REAL_API_KEY;
     }
   } else {
     document.getElementById('adminNavBtn').style.display = 'none';
@@ -724,7 +808,7 @@ async function showCreateGroupPrompt() {
 }
 
 async function showJoinGroupPrompt() {
-  const code = prompt("Entrez le code du groupe (ex: GRP-ABCD) :");
+  const code = prompt("Entrez le code du groupe (ex: GRP-ABCD ou FOOT26) :");
   if (!code || !code.trim()) return;
 
   const cleanCode = code.trim().toUpperCase();
