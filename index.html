@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>⚽ PronoFoot — Compétition Européenne 2026-27</title>
   <link rel="stylesheet" href="css/main.css">
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 </head>
 <body>
 
@@ -13,7 +17,7 @@
     <div class="auth-card">
       <div class="auth-header">
         <h1>⚽ PronoFoot</h1>
-        <p>Saison 2026-27 — Pronostics entre amis</p>
+        <p>Saison 2026-27 — Multijoueur en Direct</p>
       </div>
 
       <div class="auth-tabs">
@@ -25,11 +29,10 @@
 
       <!-- Formulaire Connexion -->
       <form id="loginForm" onsubmit="handleLogin(event)">
-        <div class="form-group"><label>👤 Pseudo</label><input type="text" id="loginUser" placeholder="Ton pseudo" required></div>
-        <div class="form-group"><label>🔒 Mot de passe</label><input type="password" id="loginPass" placeholder="••••••" required></div>
-        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:10px">Se connecter →</button>
+        <div class="form-group"><label>📧 Adresse Email</label><input type="email" id="loginEmail" placeholder="ton@email.com" required></div>
+        <div class="form-group"><label>🔒 Mot de passe</label><input type="password" id="loginPass" placeholder="••••••••" required></div>
+        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:10px" id="loginBtn">Se connecter →</button>
         
-        <!-- BOUTON CONNEXION ADMIN EXPRESS -->
         <button type="button" class="btn btn-gold btn-sm" style="width:100%;margin-top:12px" onclick="quickAdminLogin()">
           ⭐ Se connecter en ADMIN
         </button>
@@ -37,10 +40,10 @@
 
       <!-- Formulaire Inscription -->
       <form id="registerForm" style="display:none" onsubmit="handleRegister(event)">
-        <div class="form-group"><label>👤 Pseudo</label><input type="text" id="regUser" placeholder="Ex: Mathis_92" required minlength="3"></div>
-        <div class="form-group"><label>📧 Email</label><input type="email" id="regEmail" placeholder="ton@email.com" required></div>
+        <div class="form-group"><label>👤 Pseudo de joueur</label><input type="text" id="regUser" placeholder="Ex: Mathis_92" required minlength="3"></div>
+        <div class="form-group"><label>📧 Adresse Email</label><input type="email" id="regEmail" placeholder="ton@email.com" required></div>
         <div class="form-group"><label>🔒 Mot de passe</label><input type="password" id="regPass" placeholder="Min. 6 caractères" required minlength="6"></div>
-        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:10px">Rejoindre la compétition 2026-27 →</button>
+        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:10px" id="registerBtn">Créer mon compte Cloud →</button>
       </form>
     </div>
   </div>
@@ -70,7 +73,7 @@
       <div class="page-section active" id="page-dashboard">
         <div class="welcome-banner">
           <h2 id="welcomeMsg">Bienvenue ! 👋</h2>
-          <p>Pronostique les matchs de la saison 2026-27 et deviens le champion !</p>
+          <p>Compétition en ligne connectée au Cloud Firebase en temps réel !</p>
         </div>
 
         <div id="announcementBox" style="display:none;background:var(--bg-card);border:1px solid var(--gold);padding:12px 16px;border-radius:var(--radius-sm);margin-bottom:20px;color:var(--gold)">
@@ -79,12 +82,12 @@
 
         <div class="stats-grid">
           <div class="stat-card"><div class="val" id="statPoints">0</div><div class="lbl">Mes Points</div></div>
-          <div class="stat-card"><div class="val" id="statRank">#-</div><div class="lbl">Mon Rang</div></div>
-          <div class="stat-card"><div class="val" id="statPredictions">0</div><div class="lbl">Pronostics</div></div>
+          <div class="stat-card"><div class="val" id="statRank">#-</div><div class="lbl">Mon Rang Cloud</div></div>
+          <div class="stat-card"><div class="val" id="statPredictions">0</div><div class="lbl">Mes Pronos</div></div>
           <div class="stat-card"><div class="val" id="statExact">0</div><div class="lbl">Scores Exacts (+5)</div></div>
         </div>
 
-        <h3 style="margin-bottom:12px">🏆 Classement Général (Saison 2026-27)</h3>
+        <h3 style="margin-bottom:12px">🏆 Classement en direct (Multijoueur)</h3>
         <div id="dashboardLeaderboard" style="margin-bottom:20px"></div>
 
         <button class="btn btn-primary" style="width:100%;padding:14px;font-size:1.05rem" onclick="navigateTo('matches')">
@@ -94,12 +97,11 @@
 
       <!-- MATCHS -->
       <div class="page-section" id="page-matches">
-        <!-- Bannière du championnat sélectionné -->
         <div id="leagueBannerArea"></div>
 
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;flex-wrap:wrap;gap:10px">
           <h3 id="matchesSectionTitle" class="league-title-special">⚽ Calendrier 2026-27</h3>
-          <button class="btn btn-primary btn-sm" onclick="saveAll()">💾 Tout Sauvegarder</button>
+          <button class="btn btn-primary btn-sm" onclick="saveAll()">💾 Sauvegarder dans le Cloud</button>
         </div>
 
         <div class="league-tabs">
@@ -117,8 +119,8 @@
 
       <!-- CLASSEMENT -->
       <div class="page-section" id="page-leaderboard">
-        <h3 style="margin-bottom:5px" class="league-title-special">🏆 Classement Général 2026-27</h3>
-        <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:20px">Points recalculés automatiquement après chaque score entré par l'administrateur.</p>
+        <h3 style="margin-bottom:5px" class="league-title-special">🏆 Classement Général Cloud</h3>
+        <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:20px">Synchronisation instantanée Firebase dès qu'un score est validé.</p>
 
         <div id="podiumContainer" style="margin-bottom:25px"></div>
         <div id="leaderboardContainer"></div>
@@ -164,14 +166,14 @@
             </ul>
 
             <h4>⚡ Recalcul Automatique</h4>
-            <p>Dès qu'un match se termine et que le score est enregistré par l'administrateur, vos points et le classement général sont actualisés <strong>instantanément</strong>.</p>
+            <p>Dès qu'un match se termine et que le score est enregistré par l'administrateur, vos points et le classement général sont actualisés <strong>instantanément pour tous les joueurs connectés</strong>.</p>
           </div>
         </div>
       </div>
 
       <!-- PROFIL -->
       <div class="page-section" id="page-profile">
-        <h3 style="margin-bottom:15px" class="league-title-special">👤 Mon Profil</h3>
+        <h3 style="margin-bottom:15px" class="league-title-special">👤 Mon Profil Joueur</h3>
         <div class="admin-card" style="text-align:center;max-width:400px;margin:0 auto">
           <div class="nav-avatar" style="width:70px;height:70px;font-size:1.8rem;margin:0 auto 12px" id="profileBigAvatar">?</div>
           <h2 id="profileUsername">-</h2>
@@ -186,15 +188,15 @@
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px">
           <div>
             <h3 class="league-title-special">⚙️ Panneau de Contrôle Administrateur</h3>
-            <p style="color:var(--text-muted);font-size:0.85rem">Gérez les scores, les bannières et les arrière-plans distincts par section.</p>
+            <p style="color:var(--text-muted);font-size:0.85rem">Les modifications de scores et d'images sont envoyées instantanément sur Firebase Cloud.</p>
           </div>
         </div>
 
         <div class="admin-grid">
 
-          <!-- 1. ENTRÉE DES SCORES -->
+          <!-- ENTRÉE DES SCORES -->
           <div class="admin-card" style="grid-column:1/-1">
-            <h4>⚽ Enregistrement des Scores (Recalcul automatique instantané)</h4>
+            <h4>⚽ Enregistrement des Scores (Synchronisation Cloud Directe)</h4>
             <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
               <button class="btn btn-primary btn-sm" onclick="adminSimulateScores()">🎲 Simuler 10 scores</button>
               <button class="btn btn-gold btn-sm" onclick="adminSimulateAll()">🎲 Simuler TOUS les matchs</button>
@@ -203,42 +205,33 @@
             <div id="adminMatchList" style="max-height:420px;overflow-y:auto"></div>
           </div>
 
-          <!-- 2. GESTION DES ARRIÈRE-PLANS PAR LIGUE -->
+          <!-- GESTION DES ARRIÈRE-PLANS -->
           <div class="admin-card" style="grid-column: 1 / -1">
             <h4>🖼️ Arrière-plans distincts par Championnat</h4>
-            <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">Téléversez une image de fond différente depuis votre ordinateur pour chaque onglet :</p>
+            <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">Chargez une photo pour chaque ligue (visible par tous les joueurs) :</p>
             <div id="adminLeagueBackgrounds"></div>
           </div>
 
-          <!-- 3. BANNIÈRES DES CHAMPIONNATS -->
+          <!-- BANNIÈRES -->
           <div class="admin-card" style="grid-column: 1 / -1">
             <h4>🏟️ Bannières (En-tête) par Championnat</h4>
-            <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">Images d'en-tête affichées en haut de la liste de matchs :</p>
             <div id="adminLeagueBanners"></div>
           </div>
 
-          <!-- 4. THÈME GLOBAL ET ACCUEIL -->
+          <!-- FOND D'ACCUEIL -->
           <div class="admin-card">
-            <h4>🖼️ Fond d'Écran Accueil / Profil</h4>
-            <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:10px">Chargez une image pour la page d'accueil depuis votre ordinateur :</p>
+            <h4>🖼️ Fond d'Écran d'Accueil</h4>
             <div class="form-group">
               <label style="background:var(--accent);color:white;padding:10px 14px;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-size:0.85rem;font-weight:bold;width:100%;justify-content:center">
-                📁 Charger fond d'accueil
+                📁 Charger fond d'accueil depuis PC
                 <input type="file" accept="image/*" style="display:none" onchange="uploadBgFromFile(event)">
               </label>
             </div>
-            <p style="font-size:0.75rem;color:var(--text-dim);margin-bottom:6px">Ou choisissez un stade prédéfini :</p>
-            <div style="display:flex;gap:6px;margin-bottom:10px">
-              <button class="btn btn-secondary btn-xs" onclick="setPresetBg('stadium')">🏟️ Grand Stade</button>
-              <button class="btn btn-secondary btn-xs" onclick="setPresetBg('night')">🌙 Stade Nuit</button>
-              <button class="btn btn-secondary btn-xs" onclick="setPresetBg('pitch')">🌱 Pelouse</button>
-            </div>
           </div>
 
-          <!-- 5. COULEURS DE THÈME -->
+          <!-- THÈME COULEURS -->
           <div class="admin-card">
             <h4>🎨 Changer la Couleur du Thème</h4>
-            <p style="font-size:0.8rem;color:var(--text-muted)">Couleur d'accentuation générale :</p>
             <div class="theme-colors">
               <div class="theme-dot active" style="background:#e94560" onclick="changeTheme('#e94560')"></div>
               <div class="theme-dot" style="background:#00b894" onclick="changeTheme('#00b894')"></div>
@@ -250,18 +243,18 @@
             </div>
           </div>
 
-          <!-- 6. PUBLIER UNE ANNONCE -->
+          <!-- ANNONCE -->
           <div class="admin-card">
-            <h4>📢 Annonce Générale</h4>
+            <h4>📢 Annonce Générale (Envoyée à tous)</h4>
             <div class="form-group">
-              <input type="text" id="adminAnnounceInput" placeholder="Ex: Fin des pronostics pour la Journée 1 !">
+              <input type="text" id="adminAnnounceInput" placeholder="Ex: Fin des pronostics Journée 1 !">
             </div>
-            <button class="btn btn-gold btn-sm" style="width:100%" onclick="adminPublishAnnouncement()">Publier l'Annonce</button>
+            <button class="btn btn-gold btn-sm" style="width:100%" onclick="adminPublishAnnouncement()">Publier sur le Cloud</button>
           </div>
 
-          <!-- 7. STATISTIQUES EN DIRECT -->
+          <!-- STATS -->
           <div class="admin-card">
-            <h4>📊 Statistiques 2026-27</h4>
+            <h4>📊 Statistiques Cloud en Direct</h4>
             <div id="adminStats"></div>
           </div>
 
@@ -272,10 +265,10 @@
 
     <!-- FOOTER -->
     <div class="site-footer">
-      <p>⚽ PronoFoot — Compétition Officielle 2026-27</p>
+      <p>⚽ PronoFoot — Compétition Cloud 2026-27</p>
       <p style="margin-top:6px">
-        <a onclick="navigateTo('rules')">📜 Règles Officielles</a> · 
-        <a onclick="navigateTo('legal')">🔒 Confidentialité & Légal</a> · 
+        <a onclick="navigateTo('rules')">📜 Règles</a> · 
+        <a onclick="navigateTo('legal')">🔒 Confidentialité</a> · 
         <a onclick="quickAdminLogin()" style="color:var(--gold)">⭐ Espace Admin</a>
       </p>
     </div>
