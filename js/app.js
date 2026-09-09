@@ -8,15 +8,57 @@
 ];
 
 const LEAGUE_INFO = {
-  champions:{name:'Ligue des Champions',flag:'🏆',gradient:'linear-gradient(135deg,#1a1a2e,#16213e,#0f3460)',defaultBanner:'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=1200&q=80'},
-  premier:{name:'Premier League',flag:'🏴󠁧󠁢󠁥󠁮󠁧󠁿',gradient:'linear-gradient(135deg,#3d195b,#6b2fa0)',defaultBanner:'https://images.unsplash.com/photo-1522778119026-d647f0596c20?auto=format&fit=crop&w=1200&q=80'},
-  laliga:{name:'La Liga',flag:'🇪🇸',gradient:'linear-gradient(135deg,#ee8707,#f5a623)',defaultBanner:'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1200&q=80'},
-  seriea:{name:'Serie A',flag:'🇮🇹',gradient:'linear-gradient(135deg,#024494,#0066cc)',defaultBanner:'https://images.unsplash.com/photo-1518091043644-c1d4457512c6?auto=format&fit=crop&w=1200&q=80'},
-  bundesliga:{name:'Bundesliga',flag:'🇩🇪',gradient:'linear-gradient(135deg,#d20515,#ff3333)',defaultBanner:'https://images.unsplash.com/photo-1489944445391-11dd35572130?auto=format&fit=crop&w=1200&q=80'},
-  ligue1:{name:'Ligue 1',flag:'🇫🇷',gradient:'linear-gradient(135deg,#091c3e,#1a3a6e)',defaultBanner:'https://images.unsplash.com/photo-1517466787929-bc90951d0974?auto=format&fit=crop&w=1200&q=80'}
+  champions:{
+    name:'Ligue des Champions',
+    flag:'🏆',
+    accent:'#f5c518',
+    gradient:'linear-gradient(135deg,#1a1a2e,#16213e,#0f3460)',
+    defaultBanner:'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=1200&q=80',
+    defaultBg:'https://images.unsplash.com/photo-1518091043644-c1d4457512c6?auto=format&fit=crop&w=1920&q=80'
+  },
+  premier:{
+    name:'Premier League',
+    flag:'🏴󠁧󠁢󠁥󠁮󠁧󠁿',
+    accent:'#3d195b',
+    gradient:'linear-gradient(135deg,#3d195b,#6b2fa0)',
+    defaultBanner:'https://images.unsplash.com/photo-1522778119026-d647f0596c20?auto=format&fit=crop&w=1200&q=80',
+    defaultBg:'https://images.unsplash.com/photo-1522778119026-d647f0596c20?auto=format&fit=crop&w=1920&q=80'
+  },
+  laliga:{
+    name:'La Liga',
+    flag:'🇪🇸',
+    accent:'#ee8707',
+    gradient:'linear-gradient(135deg,#ee8707,#f5a623)',
+    defaultBanner:'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1200&q=80',
+    defaultBg:'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1920&q=80'
+  },
+  seriea:{
+    name:'Serie A',
+    flag:'🇮🇹',
+    accent:'#024494',
+    gradient:'linear-gradient(135deg,#024494,#0066cc)',
+    defaultBanner:'https://images.unsplash.com/photo-1510566337590-2fc1f21d0faa?auto=format&fit=crop&w=1200&q=80',
+    defaultBg:'https://images.unsplash.com/photo-1510566337590-2fc1f21d0faa?auto=format&fit=crop&w=1920&q=80'
+  },
+  bundesliga:{
+    name:'Bundesliga',
+    flag:'🇩🇪',
+    accent:'#d20515',
+    gradient:'linear-gradient(135deg,#d20515,#ff3333)',
+    defaultBanner:'https://images.unsplash.com/photo-1489944445391-11dd35572130?auto=format&fit=crop&w=1200&q=80',
+    defaultBg:'https://images.unsplash.com/photo-1489944445391-11dd35572130?auto=format&fit=crop&w=1920&q=80'
+  },
+  ligue1:{
+    name:'Ligue 1',
+    flag:'🇫🇷',
+    accent:'#091c3e',
+    gradient:'linear-gradient(135deg,#091c3e,#1a3a6e)',
+    defaultBanner:'https://images.unsplash.com/photo-1517466787929-bc90951d0974?auto=format&fit=crop&w=1200&q=80',
+    defaultBg:'https://images.unsplash.com/photo-1517466787929-bc90951d0974?auto=format&fit=crop&w=1920&q=80'
+  }
 };
 
-const AVATAR_COLORS = ['#e94560','#00b894','#6c5ce7','#fdcb6e','#0984e3','#e17055','#00cec9','#fd79a8','#a29bfe','#55efc4'];
+const AVATAR_COLORS = ['#e94560','#00b894','#6c5ce7','#gold','#0984e3','#e17055','#00cec9'];
 
 function generateDemoPredictions() {
   const preds = {};
@@ -38,22 +80,17 @@ let db = {
     { id:'u6', username:'Emma_Liga', email:'emma@test.com', pass:'123456', role:'user', points:0, preds:generateDemoPredictions(), bonuses:{} },
     { id:'u7', username:'Hugo_OM', email:'hugo@test.com', pass:'123456', role:'user', points:0, preds:generateDemoPredictions(), bonuses:{} }
   ],
-  scores: JSON.parse(localStorage.getItem('pf_scores')) || {},
-  session: localStorage.getItem('pf_session') || 'admin',
-  announce: localStorage.getItem('pf_announce') || 'Bienvenue sur la saison officielle 2026-27 de PronoFoot ! ⚽',
-  bgImage: localStorage.getItem('pf_bgImage') || 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=1920&q=80',
-  leagueBanners: JSON.parse(localStorage.getItem('pf_banners')) || {
-    champions: 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=1200&q=80',
-    premier: 'https://images.unsplash.com/photo-1522778119026-d647f0596c20?auto=format&fit=crop&w=1200&q=80',
-    laliga: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1200&q=80',
-    seriea: 'https://images.unsplash.com/photo-1518091043644-c1d4457512c6?auto=format&fit=crop&w=1200&q=80',
-    bundesliga: 'https://images.unsplash.com/photo-1489944445391-11dd35572130?auto=format&fit=crop&w=1200&q=80',
-    ligue1: 'https://images.unsplash.com/photo-1517466787929-bc90951d0974?auto=format&fit=crop&w=1200&q=80'
-  },
-  themeColor: localStorage.getItem('pf_theme') || '#e94560'
+  scores: JSON.parse(localStorage.getItem('pf_scores_v2')) || {},
+  session: localStorage.getItem('pf_session_v2') || 'admin',
+  announce: localStorage.getItem('pf_announce_v2') || 'Bienvenue sur la saison officielle 2026-27 de PronoFoot ! ⚽',
+  bgImage: localStorage.getItem('pf_bgImage_v2') || 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=1920&q=80',
+  leagueBanners: JSON.parse(localStorage.getItem('pf_banners_v2')) || {},
+  leagueBackgrounds: JSON.parse(localStorage.getItem('pf_backgrounds_v2')) || {},
+  themeColor: localStorage.getItem('pf_theme_v2') || '#e94560'
 };
 
-const savedUsers = localStorage.getItem('pf_users');
+// Charger les données de sauvegarde si elles existent
+const savedUsers = localStorage.getItem('pf_users_v2');
 if (savedUsers) {
   try {
     const parsed = JSON.parse(savedUsers);
@@ -64,7 +101,6 @@ if (savedUsers) {
 let currentUser = null;
 let currentLeague = 'all';
 
-// Compression et lecture de photo depuis PC/téléphone
 function compressAndReadFile(file, maxWidth, callback) {
   const reader = new FileReader();
   reader.onload = function(e) {
@@ -81,7 +117,7 @@ function compressAndReadFile(file, maxWidth, callback) {
       canvas.height = height;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, width, height);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
       callback(dataUrl);
     };
     img.src = e.target.result;
@@ -89,28 +125,41 @@ function compressAndReadFile(file, maxWidth, callback) {
   reader.readAsDataURL(file);
 }
 
-// Téléversement du fond d'écran
+// Téléchargement du fond global
 function uploadBgFromFile(event) {
   const file = event.target.files[0];
   if (!file) return;
   compressAndReadFile(file, 1600, function(dataUrl) {
     db.bgImage = dataUrl;
-    localStorage.setItem('pf_bgImage', dataUrl);
+    localStorage.setItem('pf_bgImage_v2', dataUrl);
     applyTheme();
-    alert('Photo de fond d\'écran appliquée avec succès ! 🖼️');
+    alert('Fond d\'accueil mis à jour ! 🖼️');
   });
 }
 
-// Téléversement d'une bannière de championnat
+// Téléchargement du fond d'écran par championnat
+function uploadLeagueBgFromFile(event, leagueKey) {
+  const file = event.target.files[0];
+  if (!file) return;
+  compressAndReadFile(file, 1600, function(dataUrl) {
+    db.leagueBackgrounds[leagueKey] = dataUrl;
+    localStorage.setItem('pf_backgrounds_v2', JSON.stringify(db.leagueBackgrounds));
+    applyTheme();
+    renderAdminLeagueBackgrounds();
+    alert(`Fond d'écran configuré pour ${LEAGUE_INFO[leagueKey].name} ! 🏟️`);
+  });
+}
+
+// Téléchargement de la bannière de championnat
 function uploadBannerFromFile(event, leagueKey) {
   const file = event.target.files[0];
   if (!file) return;
   compressAndReadFile(file, 1200, function(dataUrl) {
     db.leagueBanners[leagueKey] = dataUrl;
-    localStorage.setItem('pf_banners', JSON.stringify(db.leagueBanners));
+    localStorage.setItem('pf_banners_v2', JSON.stringify(db.leagueBanners));
     renderMatches();
     renderAdminLeagueBanners();
-    alert(`Bannière mise à jour avec succès pour ${LEAGUE_INFO[leagueKey].name} ! 🏟️`);
+    alert(`Bannière en-tête mise à jour pour ${LEAGUE_INFO[leagueKey].name} !`);
   });
 }
 
@@ -151,34 +200,41 @@ function getSorted() { return [...db.users].sort((a,b)=>b.points-a.points); }
 function getAvatarColor(u) { return AVATAR_COLORS[u.charCodeAt(0)%AVATAR_COLORS.length]; }
 
 function saveDB() {
-  localStorage.setItem('pf_users', JSON.stringify(db.users));
-  localStorage.setItem('pf_scores', JSON.stringify(db.scores));
+  localStorage.setItem('pf_users_v2', JSON.stringify(db.users));
+  localStorage.setItem('pf_scores_v2', JSON.stringify(db.scores));
 }
 
+// GESTION DU THÈME DYNAMIQUE (FOND ET COULEUR PAR LIGUE)
 function applyTheme() {
-  document.documentElement.style.setProperty('--accent', db.themeColor);
-  if (db.bgImage) {
-    document.documentElement.style.setProperty('--bg-image', `url('${db.bgImage}')`);
+  let currentBg = db.bgImage;
+  let activeAccent = db.themeColor;
+
+  // Si nous sommes sur l'onglet matchs d'une ligue spécifique, on applique ses styles
+  if (currentLeague !== 'all' && LEAGUE_INFO[currentLeague]) {
+    const li = LEAGUE_INFO[currentLeague];
+    currentBg = db.leagueBackgrounds[currentLeague] || li.defaultBg;
+    activeAccent = li.accent;
+  }
+
+  document.documentElement.style.setProperty('--accent', activeAccent);
+  if (currentBg) {
+    document.documentElement.style.setProperty('--bg-image', `url('${currentBg}')`);
   }
 }
 
 function init() {
-  applyTheme();
-  
   if (db.session) {
     currentUser = db.users.find(u => u.id === db.session) || db.users[0];
   } else {
     currentUser = db.users[0];
   }
-
-  document.getElementById('authScreen').style.display = 'none';
   recalcAllPoints();
   setupApp();
 }
 
 function quickAdminLogin() {
   currentUser = db.users.find(u => u.role === 'admin') || db.users[0];
-  localStorage.setItem('pf_session', currentUser.id);
+  localStorage.setItem('pf_session_v2', currentUser.id);
   document.getElementById('authScreen').style.display = 'none';
   recalcAllPoints();
   setupApp();
@@ -186,6 +242,7 @@ function quickAdminLogin() {
 }
 
 function setupApp() {
+  applyTheme();
   updateUI();
   renderMatches();
   renderLeaderboard();
@@ -197,6 +254,7 @@ function setupApp() {
     document.getElementById('topAdminBtn').style.display = 'block';
     renderAdminMatchList();
     renderAdminStats();
+    renderAdminLeagueBackgrounds();
     renderAdminLeagueBanners();
   } else {
     document.getElementById('adminNavBtn').style.display = 'none';
@@ -234,7 +292,7 @@ function handleLogin(e) {
     return;
   }
   currentUser = found;
-  localStorage.setItem('pf_session', found.id);
+  localStorage.setItem('pf_session_v2', found.id);
   document.getElementById('authScreen').style.display = 'none';
   recalcAllPoints();
   setupApp();
@@ -256,13 +314,13 @@ function handleRegister(e) {
   db.users.push(nu);
   saveDB();
   currentUser = nu;
-  localStorage.setItem('pf_session', nu.id);
+  localStorage.setItem('pf_session_v2', nu.id);
   document.getElementById('authScreen').style.display = 'none';
   setupApp();
 }
 
 function handleLogout() {
-  localStorage.removeItem('pf_session');
+  localStorage.removeItem('pf_session_v2');
   location.reload();
 }
 
@@ -372,6 +430,7 @@ function renderMatches() {
   let list = ALL_MATCHES;
   if (currentLeague !== 'all') list = ALL_MATCHES.filter(m => m.league === currentLeague);
 
+  // Bannière
   const bannerArea = document.getElementById('leagueBannerArea');
   if (currentLeague !== 'all' && LEAGUE_INFO[currentLeague]) {
     const li = LEAGUE_INFO[currentLeague];
@@ -586,9 +645,27 @@ function setPresetBg(type) {
     pitch: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1920&q=80'
   };
   db.bgImage = presets[type] || presets.stadium;
-  localStorage.setItem('pf_bgImage', db.bgImage);
+  localStorage.setItem('pf_bgImage_v2', db.bgImage);
   applyTheme();
   alert('Fond d\'écran appliqué ! 🏟️');
+}
+
+function renderAdminLeagueBackgrounds() {
+  const container = document.getElementById('adminLeagueBackgrounds');
+  let html = '';
+  for (const [key,li] of Object.entries(LEAGUE_INFO)) {
+    const url = db.leagueBackgrounds[key] || li.defaultBg;
+    html += `
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);flex-wrap:wrap">
+        <span style="min-width:140px;font-weight:600">${li.flag} ${li.name}</span>
+        <label style="background:var(--accent);color:white;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:bold;display:inline-flex;align-items:center;gap:4px">
+          📁 Choisir arrière-plan
+          <input type="file" accept="image/*" style="display:none" onchange="uploadLeagueBgFromFile(event, '${key}')">
+        </label>
+        <img src="${url}" style="width:70px;height:40px;object-fit:cover;border-radius:4px;border:1px solid var(--border)">
+      </div>`;
+  }
+  container.innerHTML = html;
 }
 
 function renderAdminLeagueBanners() {
@@ -600,7 +677,7 @@ function renderAdminLeagueBanners() {
       <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);flex-wrap:wrap">
         <span style="min-width:140px;font-weight:600">${li.flag} ${li.name}</span>
         <label style="background:var(--accent);color:white;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:bold;display:inline-flex;align-items:center;gap:4px">
-          📁 Choisir photo depuis PC
+          📁 Choisir bannière
           <input type="file" accept="image/*" style="display:none" onchange="uploadBannerFromFile(event, '${key}')">
         </label>
         <img src="${url}" style="width:70px;height:40px;object-fit:cover;border-radius:4px;border:1px solid var(--border)">
@@ -613,7 +690,7 @@ function adminPublishAnnouncement() {
   const t = document.getElementById('adminAnnounceInput').value.trim();
   if (!t) return;
   db.announce = t;
-  localStorage.setItem('pf_announce', t);
+  localStorage.setItem('pf_announce_v2', t);
   document.getElementById('announcementBox').style.display = 'block';
   document.getElementById('announcementText').textContent = t;
   alert('Annonce publiée sur l\'accueil ! 📢');
@@ -621,27 +698,46 @@ function adminPublishAnnouncement() {
 
 function changeTheme(c) {
   db.themeColor = c;
-  localStorage.setItem('pf_theme', c);
-  document.documentElement.style.setProperty('--accent', c);
+  localStorage.setItem('pf_theme_v2', c);
+  applyTheme();
   document.querySelectorAll('.theme-dot').forEach(d=>d.classList.remove('active'));
   event.target.classList.add('active');
 }
 
 function filterLeague(l) {
   currentLeague = l;
+  
+  // Appliquer dynamiquement le thème (fond + couleur d'accentuation) du championnat sélectionné
+  applyTheme();
+  
+  // Mettre à jour l'en-tête de la section matchs
+  const matchesTitle = document.getElementById('matchesSectionTitle');
+  if (l === 'all') {
+    matchesTitle.textContent = "⚽ Calendrier Complet 2026-27";
+  } else if (LEAGUE_INFO[l]) {
+    matchesTitle.textContent = `${LEAGUE_INFO[l].flag} Calendrier ${LEAGUE_INFO[l].name}`;
+  }
+
   document.querySelectorAll('#page-matches .league-tab').forEach(t=>t.classList.remove('active'));
-  event.target.classList.add('active');
+  if (event && event.target) event.target.classList.add('active');
+  
   renderMatches();
 }
 
 function navigateTo(p) {
+  // Réinitialiser le filtre de ligue quand on quitte la page de matchs
+  if (p !== 'matches') {
+    currentLeague = 'all';
+    applyTheme();
+  }
+
   document.querySelectorAll('.page-section').forEach(s=>s.classList.remove('active'));
   document.querySelectorAll('.bottom-nav-item').forEach(b=>b.classList.remove('active'));
   const page = document.getElementById('page-'+p);
   if (page) page.classList.add('active');
   const btn = document.querySelector(`[onclick="navigateTo('${p}')"]`);
   if (btn) btn.classList.add('active');
-  if (p==='admin') { renderAdminMatchList(); renderAdminStats(); renderAdminLeagueBanners(); }
+  if (p==='admin') { renderAdminMatchList(); renderAdminStats(); renderAdminLeagueBanners(); renderAdminLeagueBackgrounds(); }
   if (p==='leaderboard') renderLeaderboard();
   window.scrollTo({top:0, behavior:'smooth'});
 }

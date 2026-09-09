@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>⚽ PronoFoot — Saison Officielle 2026-27</title>
+  <title>⚽ PronoFoot — Compétition Européenne 2026-27</title>
   <link rel="stylesheet" href="css/main.css">
 </head>
 <body>
@@ -29,8 +29,9 @@
         <div class="form-group"><label>🔒 Mot de passe</label><input type="password" id="loginPass" placeholder="••••••" required></div>
         <button type="submit" class="btn btn-primary" style="width:100%;margin-top:10px">Se connecter →</button>
         
+        <!-- BOUTON CONNEXION ADMIN EXPRESS -->
         <button type="button" class="btn btn-gold btn-sm" style="width:100%;margin-top:12px" onclick="quickAdminLogin()">
-          ⭐ Se connecter directement en ADMIN
+          ⭐ Se connecter en ADMIN
         </button>
       </form>
 
@@ -83,7 +84,7 @@
           <div class="stat-card"><div class="val" id="statExact">0</div><div class="lbl">Scores Exacts (+5)</div></div>
         </div>
 
-        <h3 style="margin-bottom:12px">🏆 Classement en direct (Saison 2026-27)</h3>
+        <h3 style="margin-bottom:12px">🏆 Classement Général (Saison 2026-27)</h3>
         <div id="dashboardLeaderboard" style="margin-bottom:20px"></div>
 
         <button class="btn btn-primary" style="width:100%;padding:14px;font-size:1.05rem" onclick="navigateTo('matches')">
@@ -97,18 +98,18 @@
         <div id="leagueBannerArea"></div>
 
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;flex-wrap:wrap;gap:10px">
-          <h3>⚽ Calendrier Officiel 2026-27</h3>
+          <h3 id="matchesSectionTitle" class="league-title-special">⚽ Calendrier 2026-27</h3>
           <button class="btn btn-primary btn-sm" onclick="saveAll()">💾 Tout Sauvegarder</button>
         </div>
 
         <div class="league-tabs">
-          <button class="league-tab active" onclick="filterLeague('all')">🌍 Tous les matchs</button>
-          <button class="league-tab" onclick="filterLeague('champions')">🏆 Champions League</button>
-          <button class="league-tab" onclick="filterLeague('premier')">🏴 Premier League</button>
-          <button class="league-tab" onclick="filterLeague('laliga')">🇪🇸 La Liga</button>
+          <button class="league-tab active" onclick="filterLeague('all')">🌍 Tous</button>
+          <button class="league-tab" onclick="filterLeague('champions')">🏆 UCL</button>
+          <button class="league-tab" onclick="filterLeague('premier')">🏴 PL</button>
+          <button class="league-tab" onclick="filterLeague('laliga')">🇪🇸 Liga</button>
           <button class="league-tab" onclick="filterLeague('seriea')">🇮🇹 Serie A</button>
-          <button class="league-tab" onclick="filterLeague('bundesliga')">🇩🇪 Bundesliga</button>
-          <button class="league-tab" onclick="filterLeague('ligue1')">🇫🇷 Ligue 1</button>
+          <button class="league-tab" onclick="filterLeague('bundesliga')">🇩🇪 BuLi</button>
+          <button class="league-tab" onclick="filterLeague('ligue1')">🇫🇷 L1</button>
         </div>
 
         <div id="matchesContainer"></div>
@@ -116,7 +117,7 @@
 
       <!-- CLASSEMENT -->
       <div class="page-section" id="page-leaderboard">
-        <h3 style="margin-bottom:5px">🏆 Classement Général de la Saison 2026-27</h3>
+        <h3 style="margin-bottom:5px" class="league-title-special">🏆 Classement Général 2026-27</h3>
         <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:20px">Points recalculés automatiquement après chaque score entré par l'administrateur.</p>
 
         <div id="podiumContainer" style="margin-bottom:25px"></div>
@@ -127,7 +128,7 @@
       <div class="page-section" id="page-bonuses">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px">
           <div>
-            <h3>🎯 Bonus de Fin de Saison 2026-27</h3>
+            <h3 class="league-title-special">🎯 Bonus de Fin de Saison</h3>
             <p style="font-size:0.85rem;color:var(--text-muted)">Pronostique les vainqueurs finaux pour remporter des points énormes !</p>
           </div>
           <button class="btn btn-gold btn-sm" onclick="saveBonuses()">💾 Sauvegarder</button>
@@ -137,7 +138,7 @@
 
       <!-- RÈGLES DU JEU -->
       <div class="page-section" id="page-rules">
-        <h3 style="margin-bottom:15px">📜 Règles Officielles du Jeu — Saison 2026-27</h3>
+        <h3 style="margin-bottom:15px" class="league-title-special">📜 Règles Officielles du Jeu</h3>
         <div id="rulesContent">
           <div class="rules-box">
             <h3>🎮 Comment participer ?</h3>
@@ -168,23 +169,9 @@
         </div>
       </div>
 
-      <!-- CONFIDENTIALITÉ & CGU -->
-      <div class="page-section" id="page-legal">
-        <h3 style="margin-bottom:15px">🔒 Politique de Confidentialité & Mentions Légales</h3>
-        <div class="rules-box">
-          <h3>1. Collecte des Données</h3>
-          <p>Nous ne collectons que votre pseudo, email et vos pronostics. Aucune coordonnée bancaire n'est demandée (jeu 100% gratuit et récréatif).</p>
-          <h3>2. Stockage Sécurisé</h3>
-          <p>Vos pronostics sont enregistrés pour la saison 2026-27. Les mots de passe sont protégés.</p>
-          <h3>3. Règlement</h3>
-          <p>Les résultats officiels de l'UEFA et des ligues nationales 2026-27 font foi pour l'attribution des points.</p>
-          <p style="margin-top:15px;color:var(--text-dim);font-size:0.8rem">Saison 2026-27 — Version Officielle</p>
-        </div>
-      </div>
-
       <!-- PROFIL -->
       <div class="page-section" id="page-profile">
-        <h3 style="margin-bottom:15px">👤 Mon Profil</h3>
+        <h3 style="margin-bottom:15px" class="league-title-special">👤 Mon Profil</h3>
         <div class="admin-card" style="text-align:center;max-width:400px;margin:0 auto">
           <div class="nav-avatar" style="width:70px;height:70px;font-size:1.8rem;margin:0 auto 12px" id="profileBigAvatar">?</div>
           <h2 id="profileUsername">-</h2>
@@ -198,8 +185,8 @@
       <div class="page-section" id="page-admin">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px">
           <div>
-            <h3>⚙️ Panneau de Contrôle Administrateur</h3>
-            <p style="color:var(--text-muted);font-size:0.85rem">Gérez les scores, l'apparence, téléversez vos photos et publiez des annonces.</p>
+            <h3 class="league-title-special">⚙️ Panneau de Contrôle Administrateur</h3>
+            <p style="color:var(--text-muted);font-size:0.85rem">Gérez les scores, les bannières et les arrière-plans distincts par section.</p>
           </div>
         </div>
 
@@ -216,18 +203,30 @@
             <div id="adminMatchList" style="max-height:420px;overflow-y:auto"></div>
           </div>
 
-          <!-- 2. IMAGE DE FOND DU SITE (CHARGER DEPUIS PC) -->
+          <!-- 2. GESTION DES ARRIÈRE-PLANS PAR LIGUE -->
+          <div class="admin-card" style="grid-column: 1 / -1">
+            <h4>🖼️ Arrière-plans distincts par Championnat</h4>
+            <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">Téléversez une image de fond différente depuis votre ordinateur pour chaque onglet :</p>
+            <div id="adminLeagueBackgrounds"></div>
+          </div>
+
+          <!-- 3. BANNIÈRES DES CHAMPIONNATS -->
+          <div class="admin-card" style="grid-column: 1 / -1">
+            <h4>🏟️ Bannières (En-tête) par Championnat</h4>
+            <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">Images d'en-tête affichées en haut de la liste de matchs :</p>
+            <div id="adminLeagueBanners"></div>
+          </div>
+
+          <!-- 4. THÈME GLOBAL ET ACCUEIL -->
           <div class="admin-card">
-            <h4>🖼️ Fond d'Écran du Site</h4>
-            <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:10px">Chargez une image directement depuis votre ordinateur ou téléphone :</p>
-            
+            <h4>🖼️ Fond d'Écran Accueil / Profil</h4>
+            <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:10px">Chargez une image pour la page d'accueil depuis votre ordinateur :</p>
             <div class="form-group">
               <label style="background:var(--accent);color:white;padding:10px 14px;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-size:0.85rem;font-weight:bold;width:100%;justify-content:center">
-                📁 Choisir une photo sur mon PC
+                📁 Charger fond d'accueil
                 <input type="file" accept="image/*" style="display:none" onchange="uploadBgFromFile(event)">
               </label>
             </div>
-
             <p style="font-size:0.75rem;color:var(--text-dim);margin-bottom:6px">Ou choisissez un stade prédéfini :</p>
             <div style="display:flex;gap:6px;margin-bottom:10px">
               <button class="btn btn-secondary btn-xs" onclick="setPresetBg('stadium')">🏟️ Grand Stade</button>
@@ -236,10 +235,10 @@
             </div>
           </div>
 
-          <!-- 3. THÈME ET COULEURS -->
+          <!-- 5. COULEURS DE THÈME -->
           <div class="admin-card">
             <h4>🎨 Changer la Couleur du Thème</h4>
-            <p style="font-size:0.8rem;color:var(--text-muted)">Cliquez sur une couleur pour l'appliquer immédiatement :</p>
+            <p style="font-size:0.8rem;color:var(--text-muted)">Couleur d'accentuation générale :</p>
             <div class="theme-colors">
               <div class="theme-dot active" style="background:#e94560" onclick="changeTheme('#e94560')"></div>
               <div class="theme-dot" style="background:#00b894" onclick="changeTheme('#00b894')"></div>
@@ -251,14 +250,7 @@
             </div>
           </div>
 
-          <!-- 4. BANNIÈRES DES CHAMPIONNATS (CHARGER DEPUIS PC) -->
-          <div class="admin-card" style="grid-column:1/-1">
-            <h4>🏟️ Bannières des Championnats (Photos depuis votre PC)</h4>
-            <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">Chargez une image pour chaque championnat directement depuis votre appareil :</p>
-            <div id="adminLeagueBanners"></div>
-          </div>
-
-          <!-- 5. PUBLIER UNE ANNONCE -->
+          <!-- 6. PUBLIER UNE ANNONCE -->
           <div class="admin-card">
             <h4>📢 Annonce Générale</h4>
             <div class="form-group">
@@ -267,9 +259,9 @@
             <button class="btn btn-gold btn-sm" style="width:100%" onclick="adminPublishAnnouncement()">Publier l'Annonce</button>
           </div>
 
-          <!-- 6. STATISTIQUES EN DIRECT -->
+          <!-- 7. STATISTIQUES EN DIRECT -->
           <div class="admin-card">
-            <h4>📊 Statistiques de la Saison 2026-27</h4>
+            <h4>📊 Statistiques 2026-27</h4>
             <div id="adminStats"></div>
           </div>
 
