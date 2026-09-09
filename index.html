@@ -29,7 +29,6 @@
         <div class="form-group"><label>🔒 Mot de passe</label><input type="password" id="loginPass" placeholder="••••••" required></div>
         <button type="submit" class="btn btn-primary" style="width:100%;margin-top:10px">Se connecter →</button>
         
-        <!-- BOUTON CONNEXION ADMIN EXPRESS -->
         <button type="button" class="btn btn-gold btn-sm" style="width:100%;margin-top:12px" onclick="quickAdminLogin()">
           ⭐ Se connecter directement en ADMIN
         </button>
@@ -200,7 +199,7 @@
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px">
           <div>
             <h3>⚙️ Panneau de Contrôle Administrateur</h3>
-            <p style="color:var(--text-muted);font-size:0.85rem">Gérez les scores, l'apparence, les images et les annonces de la saison 2026-27.</p>
+            <p style="color:var(--text-muted);font-size:0.85rem">Gérez les scores, l'apparence, téléversez vos photos et publiez des annonces.</p>
           </div>
         </div>
 
@@ -217,7 +216,27 @@
             <div id="adminMatchList" style="max-height:420px;overflow-y:auto"></div>
           </div>
 
-          <!-- 2. THÈME ET COULEURS -->
+          <!-- 2. IMAGE DE FOND DU SITE (CHARGER DEPUIS PC) -->
+          <div class="admin-card">
+            <h4>🖼️ Fond d'Écran du Site</h4>
+            <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:10px">Chargez une image directement depuis votre ordinateur ou téléphone :</p>
+            
+            <div class="form-group">
+              <label style="background:var(--accent);color:white;padding:10px 14px;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-size:0.85rem;font-weight:bold;width:100%;justify-content:center">
+                📁 Choisir une photo sur mon PC
+                <input type="file" accept="image/*" style="display:none" onchange="uploadBgFromFile(event)">
+              </label>
+            </div>
+
+            <p style="font-size:0.75rem;color:var(--text-dim);margin-bottom:6px">Ou choisissez un stade prédéfini :</p>
+            <div style="display:flex;gap:6px;margin-bottom:10px">
+              <button class="btn btn-secondary btn-xs" onclick="setPresetBg('stadium')">🏟️ Grand Stade</button>
+              <button class="btn btn-secondary btn-xs" onclick="setPresetBg('night')">🌙 Stade Nuit</button>
+              <button class="btn btn-secondary btn-xs" onclick="setPresetBg('pitch')">🌱 Pelouse</button>
+            </div>
+          </div>
+
+          <!-- 3. THÈME ET COULEURS -->
           <div class="admin-card">
             <h4>🎨 Changer la Couleur du Thème</h4>
             <p style="font-size:0.8rem;color:var(--text-muted)">Cliquez sur une couleur pour l'appliquer immédiatement :</p>
@@ -232,27 +251,11 @@
             </div>
           </div>
 
-          <!-- 3. IMAGE DE FOND DU SITE -->
-          <div class="admin-card">
-            <h4>🖼️ Image de Fond du Site (Stades HD)</h4>
-            <p style="font-size:0.8rem;color:var(--text-muted)">Collez l'URL d'une image ou choisissez un fond prédéfini :</p>
-            <div class="form-group">
-              <input type="text" id="adminBgImage" placeholder="https://..." value="https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=1920&q=80">
-            </div>
-            <div style="display:flex;gap:6px;margin-bottom:10px">
-              <button class="btn btn-secondary btn-xs" onclick="setPresetBg('stadium')">🏟️ Grand Stade</button>
-              <button class="btn btn-secondary btn-xs" onclick="setPresetBg('night')">🌙 Stade Nuit</button>
-              <button class="btn btn-secondary btn-xs" onclick="setPresetBg('pitch')">🌱 Pelouse</button>
-            </div>
-            <button class="btn btn-primary btn-sm" style="width:100%" onclick="adminSaveBgImage()">Appliquer l'image de fond</button>
-          </div>
-
-          <!-- 4. BANNIÈRES DES CHAMPIONNATS -->
+          <!-- 4. BANNIÈRES DES CHAMPIONNATS (CHARGER DEPUIS PC) -->
           <div class="admin-card" style="grid-column:1/-1">
-            <h4>🏟️ Bannières Personnalisées par Championnat</h4>
-            <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">Images d'en-tête affichées en haut des matchs :</p>
+            <h4>🏟️ Bannières des Championnats (Photos depuis votre PC)</h4>
+            <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">Chargez une image pour chaque championnat directement depuis votre appareil :</p>
             <div id="adminLeagueBanners"></div>
-            <button class="btn btn-gold btn-sm" style="width:100%;margin-top:12px" onclick="adminSaveLeagueBanners()">💾 Sauvegarder les Bannières</button>
           </div>
 
           <!-- 5. PUBLIER UNE ANNONCE -->

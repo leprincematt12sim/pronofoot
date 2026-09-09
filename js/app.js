@@ -53,7 +53,6 @@ let db = {
   themeColor: localStorage.getItem('pf_theme') || '#e94560'
 };
 
-// Charger les utilisateurs sauvegardés s'ils existent
 const savedUsers = localStorage.getItem('pf_users');
 if (savedUsers) {
   try {
@@ -64,6 +63,56 @@ if (savedUsers) {
 
 let currentUser = null;
 let currentLeague = 'all';
+
+// Compression et lecture de photo depuis PC/téléphone
+function compressAndReadFile(file, maxWidth, callback) {
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const img = new Image();
+    img.onload = function() {
+      const canvas = document.createElement('canvas');
+      let width = img.width;
+      let height = img.height;
+      if (width > maxWidth) {
+        height = Math.round((height * maxWidth) / width);
+        width = maxWidth;
+      }
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+      callback(dataUrl);
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// Téléversement du fond d'écran
+function uploadBgFromFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  compressAndReadFile(file, 1600, function(dataUrl) {
+    db.bgImage = dataUrl;
+    localStorage.setItem('pf_bgImage', dataUrl);
+    applyTheme();
+    alert('Photo de fond d\'écran appliquée avec succès ! 🖼️');
+  });
+}
+
+// Téléversement d'une bannière de championnat
+function uploadBannerFromFile(event, leagueKey) {
+  const file = event.target.files[0];
+  if (!file) return;
+  compressAndReadFile(file, 1200, function(dataUrl) {
+    db.leagueBanners[leagueKey] = dataUrl;
+    localStorage.setItem('pf_banners', JSON.stringify(db.leagueBanners));
+    renderMatches();
+    renderAdminLeagueBanners();
+    alert(`Bannière mise à jour avec succès pour ${LEAGUE_INFO[leagueKey].name} ! 🏟️`);
+  });
+}
 
 function calcPts(pred, score) {
   if (!pred || pred.h==='' || pred.a==='' || !score) return 0;
@@ -119,7 +168,7 @@ function init() {
   if (db.session) {
     currentUser = db.users.find(u => u.id === db.session) || db.users[0];
   } else {
-    currentUser = db.users[0]; // Par défaut Admin
+    currentUser = db.users[0];
   }
 
   document.getElementById('authScreen').style.display = 'none';
@@ -143,14 +192,12 @@ function setupApp() {
   renderDashboardLeaderboard();
   renderBonuses();
   
-  // Afficher les boutons Admin si le compte est admin
   if (currentUser && currentUser.role === 'admin') {
     document.getElementById('adminNavBtn').style.display = 'flex';
     document.getElementById('topAdminBtn').style.display = 'block';
     renderAdminMatchList();
     renderAdminStats();
     renderAdminLeagueBanners();
-    document.getElementById('adminBgImage').value = db.bgImage;
   } else {
     document.getElementById('adminNavBtn').style.display = 'none';
     document.getElementById('topAdminBtn').style.display = 'none';
@@ -325,7 +372,6 @@ function renderMatches() {
   let list = ALL_MATCHES;
   if (currentLeague !== 'all') list = ALL_MATCHES.filter(m => m.league === currentLeague);
 
-  // Bannière
   const bannerArea = document.getElementById('leagueBannerArea');
   if (currentLeague !== 'all' && LEAGUE_INFO[currentLeague]) {
     const li = LEAGUE_INFO[currentLeague];
@@ -533,23 +579,16 @@ function renderAdminStats() {
     <div style="display:flex;justify-content:space-between;padding:6px 0"><span>Pronostics totaux</span><strong style="color:var(--gold)">${p}</strong></div>`;
 }
 
-// GESTION DES IMAGES
 function setPresetBg(type) {
   const presets = {
     stadium: 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=1920&q=80',
     night: 'https://images.unsplash.com/photo-1522778119026-d647f0596c20?auto=format&fit=crop&w=1920&q=80',
     pitch: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1920&q=80'
   };
-  document.getElementById('adminBgImage').value = presets[type] || presets.stadium;
-  adminSaveBgImage();
-}
-
-function adminSaveBgImage() {
-  const url = document.getElementById('adminBgImage').value.trim();
-  db.bgImage = url;
-  localStorage.setItem('pf_bgImage', url);
+  db.bgImage = presets[type] || presets.stadium;
+  localStorage.setItem('pf_bgImage', db.bgImage);
   applyTheme();
-  alert('Image de fond appliquée sur tout le site ! 🖼️');
+  alert('Fond d\'écran appliqué ! 🏟️');
 }
 
 function renderAdminLeagueBanners() {
@@ -558,23 +597,16 @@ function renderAdminLeagueBanners() {
   for (const [key,li] of Object.entries(LEAGUE_INFO)) {
     const url = db.leagueBanners[key] || li.defaultBanner;
     html += `
-      <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);flex-wrap:wrap">
-        <span style="min-width:130px;font-weight:600">${li.flag} ${li.name}</span>
-        <input type="text" value="${url}" id="banner_${key}" style="flex:1;min-width:200px;padding:8px;background:var(--bg-dark);border:1px solid var(--border);color:white;border-radius:6px;font-size:0.85rem">
-        <img src="${url}" style="width:60px;height:35px;object-fit:cover;border-radius:4px;border:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);flex-wrap:wrap">
+        <span style="min-width:140px;font-weight:600">${li.flag} ${li.name}</span>
+        <label style="background:var(--accent);color:white;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:bold;display:inline-flex;align-items:center;gap:4px">
+          📁 Choisir photo depuis PC
+          <input type="file" accept="image/*" style="display:none" onchange="uploadBannerFromFile(event, '${key}')">
+        </label>
+        <img src="${url}" style="width:70px;height:40px;object-fit:cover;border-radius:4px;border:1px solid var(--border)">
       </div>`;
   }
   container.innerHTML = html;
-}
-
-function adminSaveLeagueBanners() {
-  for (const key of Object.keys(LEAGUE_INFO)) {
-    const url = document.getElementById('banner_'+key)?.value?.trim() || LEAGUE_INFO[key].defaultBanner;
-    db.leagueBanners[key] = url;
-  }
-  localStorage.setItem('pf_banners', JSON.stringify(db.leagueBanners));
-  renderMatches();
-  alert('Toutes les bannières des championnats ont été mises à jour ! 🏟️');
 }
 
 function adminPublishAnnouncement() {
