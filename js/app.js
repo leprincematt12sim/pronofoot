@@ -99,13 +99,79 @@ let appState = {
 let currentUser = JSON.parse(localStorage.getItem('pf_cloud_session')) || null;
 let currentLeague = 'all';
 let currentMonth = 'all';
-let activeGroup = null;
 
 function getTeamCrest(name) {
   return TEAM_CRESTS[name] || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=16213e&color=fff&size=64&bold=true`;
 }
 
-// SYNCHRONISATION AUTOMATIQUE EN DIRECT AVEC L'API SPORTS
+// ULTRA-COMPRESSION DE PHOTO SÉCURISÉE (GARANTIE POUR FIRESTORE < 100KB)
+function compressAndReadFile(file, maxWidth, quality, callback) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const img = new Image();
+    img.onload = function() {
+      const canvas = document.createElement('canvas');
+      let width = img.width;
+      let height = img.height;
+      if (width > maxWidth) {
+        height = Math.round((height * maxWidth) / width);
+        width = maxWidth;
+      }
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+      const dataUrl = canvas.toDataURL('image/jpeg', quality);
+      callback(dataUrl);
+    };
+    img.onerror = function() { alert("Erreur lors de la lecture du fichier image."); };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// TÉLÉCHARGER PHOTO DE PROFIL (ULTRA COMPRESSÉE)
+async function uploadUserAvatar(event) {
+  const file = event.target.files[0];
+  if (!file || !currentUser) return;
+
+  compressAndReadFile(file, 180, 0.6, async function(dataUrl) {
+    currentUser.avatar = dataUrl;
+    const idx = appState.users.findIndex(u => u.id === currentUser.id);
+    if (idx !== -1) appState.users[idx].avatar = dataUrl;
+    
+    try {
+      localStorage.setItem('pf_local_users', JSON.stringify(appState.users));
+      localStorage.setItem('pf_cloud_session', JSON.stringify(currentUser));
+    } catch(e) {}
+
+    if (firestore) {
+      try {
+        await firestore.collection('users').doc(currentUser.id).update({ avatar: dataUrl });
+      } catch (err) {}
+    }
+
+    updateUI();
+    renderLeaderboard();
+    renderDashboardLeaderboard();
+    alert('📸 Photo de profil mise à jour avec succès !');
+  });
+}
+
+// FONCTION VIRALE : PARTAGER SES STATS / DÉFIER UN AMI SUR WHATSAPP
+function shareChallengeWhatsApp() {
+  if (!currentUser) return;
+  const sorted = getSorted();
+  const rank = sorted.findIndex(u => u.id === currentUser.id) + 1;
+  const url = window.location.href;
+
+  const msg = `🏆 *PRONOFOOT 2026-27*\n\n👤 Joueur : *${currentUser.username}*\n⭐ Points : *${currentUser.points} pts*\n🥇 Rang : *#${rank > 0 ? rank : 1}*\n\n🔥 *Penses-tu pouvoir me battre ?* Rejoins-moi et fais tes pronostics en direct ici :\n👉 ${url}`;
+  
+  window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`, '_blank');
+}
+
+// SYNCHRO API SPORTS
 async function fetchLiveScoresFromAPI() {
   const apiKey = REAL_API_KEY;
   try {
@@ -146,9 +212,7 @@ async function fetchLiveScoresFromAPI() {
       renderLeaderboard();
       renderDashboardLeaderboard();
     }
-  } catch (e) {
-    console.log("Auto-synchro API passive:", e.message);
-  }
+  } catch (e) {}
 }
 
 async function saveAndSyncApiSports() {
@@ -203,51 +267,6 @@ async function saveAndSyncApiSports() {
   }
 }
 
-function compressAndReadFile(file, maxWidth, callback) {
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    const img = new Image();
-    img.onload = function() {
-      const canvas = document.createElement('canvas');
-      let width = img.width;
-      let height = img.height;
-      if (width > maxWidth) {
-        height = Math.round((height * maxWidth) / width);
-        width = maxWidth;
-      }
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, width, height);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-      callback(dataUrl);
-    };
-    img.src = e.target.result;
-  };
-  reader.readAsDataURL(file);
-}
-
-async function uploadUserAvatar(event) {
-  const file = event.target.files[0];
-  if (!file || !currentUser) return;
-
-  compressAndReadFile(file, 200, async function(dataUrl) {
-    currentUser.avatar = dataUrl;
-    const idx = appState.users.findIndex(u => u.id === currentUser.id);
-    if (idx !== -1) appState.users[idx].avatar = dataUrl;
-    localStorage.setItem('pf_local_users', JSON.stringify(appState.users));
-    localStorage.setItem('pf_cloud_session', JSON.stringify(currentUser));
-    
-    if (firestore) {
-      try { await firestore.collection('users').doc(currentUser.id).update({ avatar: dataUrl }); } catch (err) {}
-    }
-    updateUI();
-    renderLeaderboard();
-    renderDashboardLeaderboard();
-    alert('📸 Photo de profil mise à jour avec succès !');
-  });
-}
-
 function listenCloudData() {
   if (!firestore) return;
 
@@ -275,6 +294,7 @@ function listenCloudData() {
       renderLeaderboard();
       renderDashboardLeaderboard();
       renderGroups();
+      renderKingOfWeek();
     });
 
     firestore.collection('settings').doc('global').onSnapshot(doc => {
@@ -379,6 +399,7 @@ function setupApp() {
   renderMatches();
   renderLeaderboard();
   renderDashboardLeaderboard();
+  renderKingOfWeek();
   renderBonuses();
   renderGroups();
   renderGlobalChat();
@@ -568,6 +589,15 @@ function updateUI() {
   document.getElementById('profileUsername').textContent = currentUser.username;
   document.getElementById('profileEmail').textContent = currentUser.email;
   document.getElementById('profileRole').textContent = currentUser.role === 'admin' ? '⭐ Administrateur' : '🎮 Joueur';
+}
+
+function renderKingOfWeek() {
+  const sorted = getSorted();
+  const king = sorted[0];
+  if (!king) return;
+
+  document.getElementById('kingUsername').textContent = king.username + (king.role==='admin'?' ⭐':'');
+  document.getElementById('kingPoints').textContent = king.points + ' points au classement';
 }
 
 function renderDashboardLeaderboard() {
@@ -773,6 +803,7 @@ function renderMatches() {
   container.innerHTML = html;
 }
 
+// === GROUPES PRIVÉS & INVITATION WHATSAPP ===
 async function showCreateGroupPrompt() {
   const name = prompt("Nom de votre Groupe Privé (ex: Les Potes du Foot) :");
   if (!name || !name.trim()) return;
@@ -798,8 +829,8 @@ async function showCreateGroupPrompt() {
   appState.groups.push(newGroup);
   localStorage.setItem('pf_groups_v3', JSON.stringify(appState.groups));
   renderGroups();
-  
-  const inviteText = `Salut ! Rejoins mon groupe "${name}" sur PronoFoot pour la saison 2026-27 !\n\n1. Va sur le site\n2. Clique sur "Groupes" > "Rejoindre avec un Code"\n3. Tape ce code : ${code}`;
+
+  const inviteText = `Salut ! Rejoins mon groupe "${name}" sur PronoFoot 2026-27 !\n\n1. Va sur le site\n2. Clique sur "Groupes" > "Rejoindre avec un Code"\n3. Tape ce code : ${code}`;
   const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(inviteText)}`;
   
   if (confirm(`✅ Groupe "${name}" créé !\nCode : ${code}\n\nEnvoyer l'invitation sur WhatsApp ?`)) {
@@ -954,6 +985,53 @@ async function saveBonuses() {
     try { await firestore.collection('users').doc(currentUser.id).update({ bonuses: currentUser.bonuses }); } catch (e) {}
   }
   alert('Bonus sauvegardés ! 🎯');
+}
+
+// UPLOAD ULTRA-COMPRESSÉ DE FOND D'ÉCRAN
+function uploadBgFromFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  compressAndReadFile(file, 1200, 0.6, async function(dataUrl) {
+    appState.settings.bgImage = dataUrl;
+    try { localStorage.setItem('pf_bgImage_v2', dataUrl); } catch(e){}
+    applyTheme();
+    if (firestore) {
+      try { await firestore.collection('settings').doc('global').set({ bgImage: dataUrl }, { merge: true }); } catch (e) {}
+    }
+    alert('Fond d\'écran d\'accueil mis à jour avec succès ! 🖼️');
+  });
+}
+
+function uploadLeagueBgFromFile(event, leagueKey) {
+  const file = event.target.files[0];
+  if (!file) return;
+  compressAndReadFile(file, 1200, 0.6, async function(dataUrl) {
+    if (!appState.settings.leagueBackgrounds) appState.settings.leagueBackgrounds = {};
+    appState.settings.leagueBackgrounds[leagueKey] = dataUrl;
+    try { localStorage.setItem('pf_backgrounds_v2', JSON.stringify(appState.settings.leagueBackgrounds)); } catch(e){}
+    applyTheme();
+    renderAdminLeagueBackgrounds();
+    if (firestore) {
+      try { await firestore.collection('settings').doc('global').set({ leagueBackgrounds: appState.settings.leagueBackgrounds }, { merge: true }); } catch (e) {}
+    }
+    alert(`Arrière-plan mis à jour pour ${LEAGUE_INFO[leagueKey].name} ! 🏟️`);
+  });
+}
+
+function uploadBannerFromFile(event, leagueKey) {
+  const file = event.target.files[0];
+  if (!file) return;
+  compressAndReadFile(file, 1000, 0.6, async function(dataUrl) {
+    if (!appState.settings.leagueBanners) appState.settings.leagueBanners = {};
+    appState.settings.leagueBanners[leagueKey] = dataUrl;
+    try { localStorage.setItem('pf_banners_v2', JSON.stringify(appState.settings.leagueBanners)); } catch(e){}
+    renderMatches();
+    renderAdminLeagueBanners();
+    if (firestore) {
+      try { await firestore.collection('settings').doc('global').set({ leagueBanners: appState.settings.leagueBanners }, { merge: true }); } catch (e) {}
+    }
+    alert(`Bannière mise à jour pour ${LEAGUE_INFO[leagueKey].name} ! ⚽`);
+  });
 }
 
 function renderAdminMatchList() {

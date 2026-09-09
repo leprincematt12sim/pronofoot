@@ -53,6 +53,7 @@
       </div>
     </nav>
 
+    <!-- NAVBAR DU BAS -->
     <nav class="bottom-nav">
       <button class="bottom-nav-item active" onclick="navigateTo('dashboard')"><span>🏠</span><span>Accueil</span></button>
       <button class="bottom-nav-item" onclick="navigateTo('matches')"><span>⚽</span><span>Matchs</span></button>
@@ -64,11 +65,21 @@
 
     <div class="main-content">
 
-      <!-- DASHBOARD -->
+      <!-- 1. DASHBOARD VIRAL -->
       <div class="page-section active" id="page-dashboard">
         <div class="welcome-banner">
           <h2 id="welcomeMsg">Bienvenue ! 👋</h2>
-          <p>Pronostique les matchs de la saison 2026-27 !</p>
+          <p>Pronostique les matchs de la saison 2026-27 et grimpe au sommet !</p>
+        </div>
+
+        <!-- MINE DU ROI DE LA SEMAINE (VIRAL) -->
+        <div id="kingBannerBox" class="king-banner">
+          <div style="font-size:2.5rem">👑</div>
+          <div>
+            <div style="font-size:0.75rem;color:var(--gold);font-weight:bold;text-transform:uppercase">Leader Actuel du Classement</div>
+            <div id="kingUsername" style="font-size:1.1rem;font-weight:900">-</div>
+            <div id="kingPoints" style="font-size:0.85rem;color:var(--text-muted)">- pts</div>
+          </div>
         </div>
 
         <div id="announcementBox" style="display:none;background:var(--bg-card);border:1px solid var(--gold);padding:12px 16px;border-radius:var(--radius-sm);margin-bottom:20px;color:var(--gold)">
@@ -82,22 +93,27 @@
           <div class="stat-card"><div class="val" id="statExact">0</div><div class="lbl">Scores Exacts (+5)</div></div>
         </div>
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px">
-          <button class="btn btn-primary" onclick="navigateTo('matches')">⚽ Pronostiquer les matchs</button>
-          <button class="btn btn-gold" onclick="navigateTo('groups')">👥 Mes Groupes Privés</button>
+        <!-- BOUTON DÉFI VIRAL WHATSAPP -->
+        <div style="margin-bottom:20px">
+          <button class="btn btn-whatsapp" style="width:100%;padding:14px;font-size:1rem;margin-bottom:10px" onclick="shareChallengeWhatsApp()">
+            🔥 Défier mes amis sur WhatsApp (Partager mon score)
+          </button>
+          <button class="btn btn-primary" style="width:100%;padding:14px;font-size:1rem" onclick="navigateTo('matches')">
+            ⚽ Pronostiquer les prochains matchs →
+          </button>
         </div>
 
         <h3 style="margin-bottom:12px">🏆 Top 5 Général (Saison 2026-27)</h3>
         <div id="dashboardLeaderboard" style="margin-bottom:20px"></div>
       </div>
 
-      <!-- MATCHS -->
+      <!-- 2. MATCHS -->
       <div class="page-section" id="page-matches">
         <div id="leagueBannerArea"></div>
 
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:10px">
           <h3 id="matchesSectionTitle" class="league-title-special">⚽ Calendrier 2026-27</h3>
-          <button class="btn btn-primary btn-sm" onclick="saveAll()">💾 Sauvegarder</button>
+          <button class="btn btn-primary btn-sm" onclick="saveAll()">💾 Sauvegarder Pronos</button>
         </div>
 
         <div class="league-tabs">
@@ -127,7 +143,7 @@
         <div id="matchesContainer"></div>
       </div>
 
-      <!-- CLASSEMENT -->
+      <!-- 3. CLASSEMENT GLOBAL -->
       <div class="page-section" id="page-leaderboard">
         <h3 style="margin-bottom:5px" class="league-title-special">🏆 Classement Général Cloud</h3>
         <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:20px">Synchronisation instantanée dès qu'un score est validé.</p>
@@ -135,13 +151,13 @@
         <div id="leaderboardContainer"></div>
       </div>
 
-      <!-- GROUPES PRIVÉS -->
+      <!-- 4. GROUPES PRIVÉS -->
       <div class="page-section" id="page-groups">
-        <h3 style="margin-bottom:5px" class="league-title-special">👥 Groupes Privés & Ligas Fermées</h3>
-        <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:20px">Créez votre propre ligue fermée et invitez vos amis par WhatsApp !</p>
+        <h3 style="margin-bottom:5px" class="league-title-special">👥 Mes Groupes Privés & Ligas Fermées</h3>
+        <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:20px">Créez votre ligue privée ou rejoignez vos amis avec leur code !</p>
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
-          <button class="btn btn-primary" onclick="showCreateGroupPrompt()">➕ Créer un Groupe</button>
+          <button class="btn btn-primary" onclick="showCreateGroupPrompt()">➕ Créer un Groupe Privé</button>
           <button class="btn btn-gold" onclick="showJoinGroupPrompt()">🔑 Rejoindre avec un Code</button>
         </div>
 
@@ -151,30 +167,51 @@
           <h4 style="color:var(--gold);margin-bottom:8px">💬 Chat Privé du Groupe (<span id="chatGroupName"></span>)</h4>
           <div class="chat-box" id="chatMessagesBox"></div>
           <form onsubmit="handleSendChatMessage(event)" style="display:flex;gap:8px">
-            <input type="text" id="chatInputText" placeholder="Message..." style="flex:1;padding:10px;background:var(--bg-dark);border:1px solid var(--border);border-radius:6px;color:white" required>
+            <input type="text" id="chatInputText" placeholder="Message au groupe..." style="flex:1;padding:10px;background:var(--bg-dark);border:1px solid var(--border);border-radius:6px;color:white" required>
             <button type="submit" class="btn btn-primary btn-sm">Envoyer 🚀</button>
           </form>
         </div>
       </div>
 
-      <!-- CHAT GÉNÉRAL -->
+      <!-- 5. CHAT GÉNÉRAL -->
       <div class="page-section" id="page-chat">
         <h3 class="league-title-special" style="margin-bottom:5px">💬 Le Salon des Supporters</h3>
         <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:15px">Discutez en direct avec tous les joueurs de la communauté !</p>
 
         <div class="chat-container">
           <div class="chat-box" id="globalChatMessagesBox">
-            <p style="text-align:center;color:var(--text-muted);font-size:0.85rem">Chargement des messages en direct...</p>
+            <p style="text-align:center;color:var(--text-muted);font-size:0.85rem">Chargement des messages...</p>
           </div>
 
           <form onsubmit="handleSendGlobalChatMessage(event)" style="display:flex;gap:8px">
-            <input type="text" id="globalChatInput" placeholder="Écris ton message..." style="flex:1;padding:12px;background:var(--bg-dark);border:1px solid var(--border);border-radius:8px;color:white" required>
+            <input type="text" id="globalChatInput" placeholder="Écris ton message à tous les supporters..." style="flex:1;padding:12px;background:var(--bg-dark);border:1px solid var(--border);border-radius:8px;color:white" required>
             <button type="submit" class="btn btn-primary">Envoyer 🚀</button>
           </form>
         </div>
+
+        <div class="poll-card">
+          <h4 style="color:var(--gold);margin-bottom:8px">📊 Sondage de la Communauté</h4>
+          <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:12px">Qui va remporter la Ligue des Champions 2026-27 ?</p>
+          
+          <div class="poll-option" onclick="votePoll('real')">
+            <div class="poll-bar" id="bar_real" style="width:45%"></div>
+            <span style="position:relative">👑 Real Madrid</span>
+            <span style="position:relative" id="count_real">45%</span>
+          </div>
+          <div class="poll-option" onclick="votePoll('psg')">
+            <div class="poll-bar" id="bar_psg" style="width:30%"></div>
+            <span style="position:relative">🔴🔵 Paris SG</span>
+            <span style="position:relative" id="count_psg">30%</span>
+          </div>
+          <div class="poll-option" onclick="votePoll('mancity')">
+            <div class="poll-bar" id="bar_mancity" style="width:25%"></div>
+            <span style="position:relative">🩵 Manchester City</span>
+            <span style="position:relative" id="count_mancity">25%</span>
+          </div>
+        </div>
       </div>
 
-      <!-- BONUS -->
+      <!-- 6. BONUS -->
       <div class="page-section" id="page-bonuses">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px">
           <div><h3 class="league-title-special">🎯 Bonus de Fin de Saison</h3><p style="font-size:0.85rem;color:var(--text-muted)">Pronostique les vainqueurs finaux !</p></div>
@@ -183,7 +220,7 @@
         <div id="bonusesContainer" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:15px"></div>
       </div>
 
-      <!-- RÈGLES -->
+      <!-- 7. RÈGLES -->
       <div class="page-section" id="page-rules">
         <h3 style="margin-bottom:15px" class="league-title-special">📜 Règles Officielles</h3>
         <div class="rules-box">
@@ -194,7 +231,7 @@
         </div>
       </div>
 
-      <!-- PROFIL -->
+      <!-- 8. PROFIL -->
       <div class="page-section" id="page-profile">
         <h3 style="margin-bottom:15px" class="league-title-special">👤 Mon Profil</h3>
         <div class="admin-card" style="text-align:center;max-width:400px;margin:0 auto">
@@ -210,38 +247,29 @@
           <p id="profileEmail" style="color:var(--text-muted);font-size:0.85rem;margin-bottom:8px">-</p>
           <p id="profileRole" style="color:var(--gold);font-size:0.85rem;font-weight:bold;margin-bottom:20px"></p>
 
+          <button class="btn btn-whatsapp" style="width:100%;margin-bottom:10px" onclick="shareChallengeWhatsApp()">
+            📲 Partager mes stats sur WhatsApp
+          </button>
           <button class="btn btn-secondary" style="width:100%" onclick="handleLogout()">🚪 Se Déconnecter</button>
         </div>
       </div>
 
-      <!-- ADMIN (AVEC CONNEXION API-SPORTS) -->
+      <!-- 9. ADMIN -->
       <div class="page-section" id="page-admin">
         <h3 class="league-title-special" style="margin-bottom:15px">⚙️ Panneau Administrateur</h3>
+        
+        <div class="admin-card" style="border:2px solid var(--gold)">
+          <h4 style="color:var(--gold)">⚡ Synchronization Automatique API Sports</h4>
+          <div class="form-group" style="margin-bottom:10px">
+            <input type="text" id="adminApiKeyInput" placeholder="Clé API-Sports..." style="font-family:monospace">
+          </div>
+          <button class="btn btn-gold btn-sm" onclick="saveAndSyncApiSports()">⚡ Synchro Vrais Scores</button>
+          <p id="apiSyncStatus" style="font-size:0.8rem;margin-top:8px;color:var(--green);font-weight:bold"></p>
+        </div>
 
         <div class="admin-grid">
-
-          <!-- BLOC SYNCHRO API-FOOTBALL DIRECT -->
-          <div class="admin-card" style="grid-column:1/-1;border:2px solid var(--gold)">
-            <h4 style="color:var(--gold)">⚡ Synchronization Automatique API Sports (Résultats Réels)</h4>
-            <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:10px">
-              Entrez votre clé API-Sports gratuite pour récupérer automatiquement les vrais scores réels des matchs et mettre à jour le classement :
-            </p>
-            
-            <div class="form-group" style="margin-bottom:10px">
-              <label>🔑 Clé API-Sports (api-sports.io)</label>
-              <input type="text" id="adminApiKeyInput" placeholder="Ex: 9a8b7c6d5e4f3a2b1c..." style="font-family:monospace">
-            </div>
-
-            <div style="display:flex;gap:8px;flex-wrap:wrap">
-              <button class="btn btn-gold btn-sm" onclick="saveAndSyncApiSports()">⚡ Sauvegarder & Synchro Vrais Scores</button>
-              <button class="btn btn-secondary btn-sm" onclick="saveApiKeyOnly()">💾 Sauvegarder la Clé</button>
-            </div>
-            <p id="apiSyncStatus" style="font-size:0.8rem;margin-top:8px;color:var(--green);font-weight:bold"></p>
-          </div>
-
-          <!-- SAISIE MANUELLE DES SCORES -->
           <div class="admin-card" style="grid-column:1/-1">
-            <h4>⚽ Saisie des Scores (Manuel / Simulation)</h4>
+            <h4>⚽ Saisie des Scores (Cloud)</h4>
             <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
               <button class="btn btn-primary btn-sm" onclick="adminSimulateScores()">🎲 Simuler 10 scores</button>
               <button class="btn btn-gold btn-sm" onclick="adminSimulateAll()">🎲 Simuler TOUT</button>
