@@ -104,7 +104,6 @@ function getTeamCrest(name) {
   return TEAM_CRESTS[name] || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=16213e&color=fff&size=64&bold=true`;
 }
 
-// ULTRA-COMPRESSION DE PHOTO SÉCURISÉE (GARANTIE POUR FIRESTORE < 100KB)
 function compressAndReadFile(file, maxWidth, quality, callback) {
   if (!file) return;
   const reader = new FileReader();
@@ -131,7 +130,6 @@ function compressAndReadFile(file, maxWidth, quality, callback) {
   reader.readAsDataURL(file);
 }
 
-// TÉLÉCHARGER PHOTO DE PROFIL (ULTRA COMPRESSÉE)
 async function uploadUserAvatar(event) {
   const file = event.target.files[0];
   if (!file || !currentUser) return;
@@ -159,7 +157,6 @@ async function uploadUserAvatar(event) {
   });
 }
 
-// FONCTION VIRALE : PARTAGER SES STATS / DÉFIER UN AMI SUR WHATSAPP
 function shareChallengeWhatsApp() {
   if (!currentUser) return;
   const sorted = getSorted();
@@ -169,102 +166,6 @@ function shareChallengeWhatsApp() {
   const msg = `🏆 *PRONOFOOT 2026-27*\n\n👤 Joueur : *${currentUser.username}*\n⭐ Points : *${currentUser.points} pts*\n🥇 Rang : *#${rank > 0 ? rank : 1}*\n\n🔥 *Penses-tu pouvoir me battre ?* Rejoins-moi et fais tes pronostics en direct ici :\n👉 ${url}`;
   
   window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`, '_blank');
-}
-
-// SYNCHRO API SPORTS
-async function fetchLiveScoresFromAPI() {
-  const apiKey = REAL_API_KEY;
-  try {
-    const todayStr = new Date().toISOString().split('T')[0];
-    const res = await fetch(`https://v3.football.api-sports.io/fixtures?date=${todayStr}`, {
-      method: "GET",
-      headers: { "x-apisports-key": apiKey }
-    });
-
-    const data = await res.json();
-    const fixtures = data.response || [];
-    let updated = 0;
-
-    fixtures.forEach(f => {
-      if (['FT', 'AET', 'PEN'].includes(f.fixture.status.short)) {
-        const homeName = f.teams.home.name.toLowerCase();
-        const awayName = f.teams.away.name.toLowerCase();
-
-        const match = ALL_MATCHES.find(m => 
-          m.home.toLowerCase().includes(homeName) || m.away.toLowerCase().includes(awayName)
-        );
-
-        if (match && !appState.scores[match.id]) {
-          appState.scores[match.id] = { h: f.goals.home, a: f.goals.away };
-          updated++;
-        }
-      }
-    });
-
-    if (updated > 0) {
-      localStorage.setItem('pf_scores_v3', JSON.stringify(appState.scores));
-      if (firestore) {
-        await firestore.collection('settings').doc('global').set({ scores: appState.scores }, { merge: true });
-      }
-      recalculateAllCloudPoints();
-      updateUI();
-      renderMatches();
-      renderLeaderboard();
-      renderDashboardLeaderboard();
-    }
-  } catch (e) {}
-}
-
-async function saveAndSyncApiSports() {
-  const apiKey = document.getElementById('adminApiKeyInput').value.trim() || REAL_API_KEY;
-  const statusEl = document.getElementById('apiSyncStatus');
-  statusEl.textContent = "⏳ Synchro en cours avec API-Sports...";
-
-  try {
-    const todayStr = new Date().toISOString().split('T')[0];
-    const res = await fetch(`https://v3.football.api-sports.io/fixtures?date=${todayStr}`, {
-      method: "GET",
-      headers: { "x-apisports-key": apiKey }
-    });
-
-    const data = await res.json();
-    const fixtures = data.response || [];
-    let count = 0;
-
-    fixtures.forEach(f => {
-      if (['FT', 'AET', 'PEN'].includes(f.fixture.status.short)) {
-        const hName = f.teams.home.name.toLowerCase();
-        const aName = f.teams.away.name.toLowerCase();
-
-        const match = ALL_MATCHES.find(m => 
-          m.home.toLowerCase().includes(hName) || m.away.toLowerCase().includes(aName)
-        );
-
-        if (match) {
-          appState.scores[match.id] = { h: f.goals.home, a: f.goals.away };
-          count++;
-        }
-      }
-    });
-
-    localStorage.setItem('pf_scores_v3', JSON.stringify(appState.scores));
-    if (firestore) {
-      await firestore.collection('settings').doc('global').set({ scores: appState.scores }, { merge: true });
-    }
-
-    recalculateAllCloudPoints();
-    updateUI();
-    renderMatches();
-    renderLeaderboard();
-    renderDashboardLeaderboard();
-    renderAdminMatchList();
-
-    statusEl.textContent = `✅ Synchro réussie ! ${count} score(s) mis à jour.`;
-    alert(`⚡ Synchro API-Sports terminée ! ${count} match(s) actualisé(s).`);
-  } catch (err) {
-    statusEl.textContent = "❌ Erreur API : " + err.message;
-    alert("Erreur API-Sports : " + err.message);
-  }
 }
 
 function listenCloudData() {
@@ -383,7 +284,6 @@ function applyTheme() {
 function init() {
   recalculateAllCloudPoints();
   listenCloudData();
-  fetchLiveScoresFromAPI();
 
   if (currentUser) {
     document.getElementById('authScreen').style.display = 'none';
@@ -404,14 +304,12 @@ function setupApp() {
   renderGroups();
   renderGlobalChat();
   
+  // N'afficher l'Admin QUE si currentUser a role === 'admin'
   if (currentUser && currentUser.role === 'admin') {
     document.getElementById('adminNavBtn').style.display = 'flex';
     document.getElementById('topAdminBtn').style.display = 'block';
     renderAdminMatchList();
     renderAdminStats();
-    if (document.getElementById('adminApiKeyInput')) {
-      document.getElementById('adminApiKeyInput').value = REAL_API_KEY;
-    }
   } else {
     document.getElementById('adminNavBtn').style.display = 'none';
     document.getElementById('topAdminBtn').style.display = 'none';
@@ -486,6 +384,7 @@ async function handleRegister(e) {
   btn.innerText = "⏳ Création...";
   btn.disabled = true;
 
+  // Rôle STRICT 'user' pour toutes les inscriptions publiques
   const newUser = {
     id: 'u_' + Date.now(),
     username,
@@ -517,27 +416,6 @@ async function handleRegister(e) {
   btn.innerText = "Créer mon compte →";
   btn.disabled = false;
   alert(`🎉 Bienvenue ${username} !`);
-}
-
-async function quickAdminLogin() {
-  const adminUser = appState.users.find(u => u.role === 'admin') || {
-    id: 'admin',
-    username: 'Admin',
-    email: 'admin@pronofoot.com',
-    pass: 'admin123',
-    role: 'admin',
-    points: 0,
-    preds: {},
-    bonuses: {},
-    groups: [],
-    avatar: null
-  };
-
-  currentUser = adminUser;
-  localStorage.setItem('pf_cloud_session', JSON.stringify(currentUser));
-  document.getElementById('authScreen').style.display = 'none';
-  setupApp();
-  navigateTo('admin');
 }
 
 function handleLogout() {
@@ -678,57 +556,50 @@ function renderLeaderboard() {
   document.getElementById('leaderboardContainer').innerHTML = html;
 }
 
-function renderGlobalChat() {
-  const box = document.getElementById('globalChatMessagesBox');
-  if (!box) return;
+// TOGGLE ET AFFICHAGE DES PRONOSTICS DE TOUS LES AUTRES JOUEURS POUR UN MATCH
+function toggleMatchPredictions(matchId) {
+  const el = document.getElementById('all_preds_' + matchId);
+  if (!el) return;
 
-  let html = '';
-  appState.globalChat.forEach(m => {
-    const isMine = currentUser && m.senderName === currentUser.username;
-    const senderUser = appState.users.find(u => u.username === m.senderName) || { username: m.senderName };
-    const avatarHtml = getAvatarHtml(senderUser, 24, 0.7);
+  if (el.style.display === 'none') {
+    const match = ALL_MATCHES.find(m => m.id === matchId);
+    const score = appState.scores[matchId];
+    
+    // Lister tous les joueurs qui ont pronostiqué ce match
+    let html = '<div style="font-weight:bold;color:var(--gold);margin-bottom:8px;border-bottom:1px solid var(--border);padding-bottom:4px">👥 Pronostics des joueurs :</div>';
+    let userPredCount = 0;
 
-    html += `
-      <div class="chat-msg ${isMine?'mine':''}" style="display:flex;gap:8px">
-        ${!isMine ? avatarHtml : ''}
-        <div style="flex:1">
-          <div class="sender"><span>${isMine ? 'Moi' : m.senderName}</span> <span>${m.time || ''}</span></div>
-          <div>${m.text}</div>
-        </div>
-        ${isMine ? avatarHtml : ''}
-      </div>`;
-  });
+    appState.users.forEach(u => {
+      const pred = u.preds && u.preds[matchId];
+      if (pred && pred.h !== '' && pred.a !== '') {
+        userPredCount++;
+        let resultLabel = '';
+        if (score) {
+          const pts = calcPts(pred, score);
+          const ptsClass = pts === 5 ? 'pts-exact' : pts === 3 ? 'pts-correct' : 'pts-wrong';
+          resultLabel = `<span class="${ptsClass}" style="margin-left:auto;font-weight:bold">(+${pts} pts)</span>`;
+        }
+        
+        const avatarHtml = getAvatarHtml(u, 22, 0.6);
+        html += `
+          <div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:0.85rem">
+            ${avatarHtml}
+            <span style="flex:1"><strong>${u.username}</strong></span>
+            <span style="background:var(--bg-dark);padding:2px 8px;border-radius:4px;font-weight:bold">${pred.h} - ${pred.a}</span>
+            ${resultLabel}
+          </div>`;
+      }
+    });
 
-  box.innerHTML = html || '<p style="text-align:center;color:var(--text-muted);font-size:0.85rem">Aucun message. Soyez le premier !</p>';
-  box.scrollTop = box.scrollHeight;
-}
+    if (userPredCount === 0) {
+      html += '<p style="color:var(--text-muted);font-size:0.8rem">Aucun joueur n\'a encore pronostiqué ce match.</p>';
+    }
 
-async function handleSendGlobalChatMessage(e) {
-  e.preventDefault();
-  if (!currentUser) return;
-  const input = document.getElementById('globalChatInput');
-  const txt = input.value.trim();
-  if (!txt) return;
-
-  input.value = '';
-  const now = new Date();
-  const timeStr = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
-
-  const msgData = {
-    senderId: currentUser.id,
-    senderName: currentUser.username,
-    text: txt,
-    time: timeStr,
-    timestamp: firebase.firestore ? firebase.firestore.FieldValue.serverTimestamp() : Date.now()
-  };
-
-  if (firestore) {
-    try { await firestore.collection('global_chat').add(msgData); } catch (e) {}
+    el.innerHTML = html;
+    el.style.display = 'block';
+  } else {
+    el.style.display = 'none';
   }
-
-  appState.globalChat.push(msgData);
-  localStorage.setItem('pf_global_chat', JSON.stringify(appState.globalChat));
-  renderGlobalChat();
 }
 
 function renderMatches() {
@@ -766,6 +637,12 @@ function renderMatches() {
     const homeCrest = getTeamCrest(m.home);
     const awayCrest = getTeamCrest(m.away);
 
+    // Compter combien d'utilisateurs ont pronostiqué ce match
+    let totalPredsForMatch = 0;
+    appState.users.forEach(u => {
+      if (u.preds && u.preds[m.id] && u.preds[m.id].h !== '') totalPredsForMatch++;
+    });
+
     let res = '';
     if (done) {
       const pts = calcPts(pred, score);
@@ -798,436 +675,43 @@ function renderMatches() {
           <input type="number" min="0" max="15" value="${pred.a}" id="a_${m.id}" placeholder="-">
         </div>` : ''}
         ${res}
-      </div>`;
-  });
-  container.innerHTML = html;
-}
 
-// === GROUPES PRIVÉS & INVITATION WHATSAPP ===
-async function showCreateGroupPrompt() {
-  const name = prompt("Nom de votre Groupe Privé (ex: Les Potes du Foot) :");
-  if (!name || !name.trim()) return;
-
-  const code = 'GRP-' + Math.random().toString(36).substring(2, 6).toUpperCase();
-  const newGroup = {
-    id: 'grp_' + Date.now(),
-    name: name.trim(),
-    code: code,
-    createdBy: currentUser ? currentUser.id : 'admin',
-    creatorName: currentUser ? currentUser.username : 'Admin',
-    members: currentUser ? [currentUser.id] : ['admin'],
-    createdAt: new Date().toISOString()
-  };
-
-  if (firestore) {
-    try {
-      const ref = await firestore.collection('groups').add(newGroup);
-      newGroup.id = ref.id;
-    } catch (e) {}
-  }
-
-  appState.groups.push(newGroup);
-  localStorage.setItem('pf_groups_v3', JSON.stringify(appState.groups));
-  renderGroups();
-
-  const inviteText = `Salut ! Rejoins mon groupe "${name}" sur PronoFoot 2026-27 !\n\n1. Va sur le site\n2. Clique sur "Groupes" > "Rejoindre avec un Code"\n3. Tape ce code : ${code}`;
-  const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(inviteText)}`;
-  
-  if (confirm(`✅ Groupe "${name}" créé !\nCode : ${code}\n\nEnvoyer l'invitation sur WhatsApp ?`)) {
-    window.open(whatsappUrl, '_blank');
-  }
-}
-
-async function showJoinGroupPrompt() {
-  const code = prompt("Entrez le code du groupe (ex: GRP-ABCD ou FOOT26) :");
-  if (!code || !code.trim()) return;
-
-  const cleanCode = code.trim().toUpperCase();
-  const localGroup = appState.groups.find(g => g.code === cleanCode);
-
-  if (localGroup) {
-    if (currentUser && !localGroup.members.includes(currentUser.id)) {
-      localGroup.members.push(currentUser.id);
-      localStorage.setItem('pf_groups_v3', JSON.stringify(appState.groups));
-    }
-    renderGroups();
-    alert(`🎉 Vous avez rejoint le groupe "${localGroup.name}" !`);
-    return;
-  }
-
-  alert("❌ Code invalide.");
-}
-
-function shareGroupWhatsApp(code, name) {
-  const inviteText = `Salut ! Rejoins ma ligue "${name}" sur PronoFoot 2026-27 !\n\n1. Va sur le site\n2. Clique sur l'onglet "Groupes" > "Rejoindre avec un Code"\n3. Tape ce code secret : ${code}`;
-  window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(inviteText)}`, '_blank');
-}
-
-function renderGroups() {
-  const container = document.getElementById('groupsListContainer');
-  if (!container) return;
-
-  let myGroups = [];
-  if (currentUser) {
-    myGroups = appState.groups.filter(g => g.members && g.members.includes(currentUser.id));
-  }
-  if (myGroups.length === 0) myGroups = appState.groups;
-
-  if (myGroups.length === 0) {
-    container.innerHTML = '<div class="rules-box"><p style="text-align:center">Aucun groupe privé. Créez-en un avec le bouton ci-dessus !</p></div>';
-    return;
-  }
-
-  let html = '';
-  myGroups.forEach(g => {
-    const groupUsers = appState.users.filter(u => g.members && g.members.includes(u.id)).sort((a,b) => b.points - a.points);
-
-    html += `
-      <div class="group-card">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
-          <div>
-            <h3 style="color:var(--accent);margin-bottom:2px">${g.name}</h3>
-            <span style="font-size:0.8rem;color:var(--text-muted)">Créé par ${g.creatorName} · ${groupUsers.length} membre(s)</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:6px">
-            <span class="group-code-badge">${g.code}</span>
-            <button class="btn btn-sm" style="background:#25D366;color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:bold" onclick="shareGroupWhatsApp('${g.code}', '${g.name.replace(/'/g, "\\'")}')">💬 Inviter WhatsApp</button>
-          </div>
+        <!-- BOUTON VOIR LES PRONOSTICS DES AUTRES JOUEURS -->
+        <div style="text-align:center;margin-top:12px;border-top:1px solid var(--border);padding-top:8px">
+          <button class="btn btn-secondary btn-xs" onclick="toggleMatchPredictions('${m.id}')">
+            👥 Voir les pronos des autres (${totalPredsForMatch} joueur${totalPredsForMatch>1?'s':''})
+          </button>
         </div>
 
-        <table class="leaderboard-table" style="font-size:0.85rem">
-          <thead><tr><th>#</th><th>Membre</th><th>Pronos</th><th>Points</th></tr></thead>
-          <tbody>
-            ${groupUsers.map((u, i) => `
-              <tr class="${currentUser && u.id===currentUser.id?'current-user':''}">
-                <td>${i===0?'🥇':i===1?'🥈':i===2?'🥉':'#'+(i+1)}</td>
-                <td>
-                  <div style="display:flex;align-items:center;gap:6px">
-                    ${getAvatarHtml(u, 24, 0.6)}
-                    <strong>${u.username}</strong> ${currentUser && u.id===currentUser.id?'(toi)':''}
-                  </div>
-                </td>
-                <td>${Object.keys(u.preds||{}).length}</td>
-                <td style="color:var(--gold);font-weight:bold">${u.points} pts</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
+        <!-- CONTENEUR DES PRONOS DES AUTRES (CACHÉ PAR DÉFAUT) -->
+        <div id="all_preds_${m.id}" style="display:none;margin-top:10px;padding:10px;background:var(--bg-dark);border-radius:8px;border:1px solid var(--border)"></div>
       </div>`;
   });
-
   container.innerHTML = html;
 }
 
-async function saveAll() {
-  if (!currentUser) return;
-  if (!currentUser.preds) currentUser.preds = {};
-  let count = 0;
-
-  document.querySelectorAll('.match-prediction input').forEach(input => {
-    const id = input.id.substring(2);
-    const h = document.getElementById('h_' + id)?.value;
-    const a = document.getElementById('a_' + id)?.value;
-    if (h !== '' && a !== '') {
-      currentUser.preds[id] = { h: parseInt(h), a: parseInt(a) };
-      count++;
-    }
-  });
-
-  const idx = appState.users.findIndex(u => u.id === currentUser.id);
-  if (idx !== -1) appState.users[idx] = currentUser;
-  localStorage.setItem('pf_local_users', JSON.stringify(appState.users));
-  localStorage.setItem('pf_cloud_session', JSON.stringify(currentUser));
-
-  if (firestore) {
-    try { await firestore.collection('users').doc(currentUser.id).update({ preds: currentUser.preds }); } catch (err) {}
-  }
-
-  recalculateAllCloudPoints();
-  updateUI();
-  renderMatches();
-  renderLeaderboard();
-  renderDashboardLeaderboard();
-  alert(`${count} pronostics enregistrés ! ☁️✅`);
-}
-
-function renderBonuses() {
-  const c = document.getElementById('bonusesContainer');
-  const mb = (currentUser && currentUser.bonuses) || {};
-  c.innerHTML = BONUS_CONFIG.map(b => {
-    const sel = mb[b.id] || '';
-    const opts = b.teams.map(t => `<option value="${t}" ${t===sel?'selected':''}>${t}</option>`).join('');
-    return `
-      <div class="admin-card">
-        <h4 style="font-size:0.95rem">${b.label} <span style="color:var(--gold)">(+${b.pts} pts)</span></h4>
-        <select id="bonus_${b.id}" style="width:100%;margin-top:8px;padding:8px;background:var(--bg-dark);border:1px solid var(--border);color:white;border-radius:6px">
-          <option value="">-- Choisir le champion --</option>
-          ${opts}
-        </select>
-      </div>`;
-  }).join('');
-}
-
-async function saveBonuses() {
-  if (!currentUser) return;
-  if (!currentUser.bonuses) currentUser.bonuses = {};
-  BONUS_CONFIG.forEach(b => {
-    const v = document.getElementById('bonus_' + b.id)?.value;
-    if (v) currentUser.bonuses[b.id] = v;
-  });
-
-  const idx = appState.users.findIndex(u => u.id === currentUser.id);
-  if (idx !== -1) appState.users[idx] = currentUser;
-  localStorage.setItem('pf_local_users', JSON.stringify(appState.users));
-  localStorage.setItem('pf_cloud_session', JSON.stringify(currentUser));
-
-  if (firestore) {
-    try { await firestore.collection('users').doc(currentUser.id).update({ bonuses: currentUser.bonuses }); } catch (e) {}
-  }
-  alert('Bonus sauvegardés ! 🎯');
-}
-
-// UPLOAD ULTRA-COMPRESSÉ DE FOND D'ÉCRAN
-function uploadBgFromFile(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  compressAndReadFile(file, 1200, 0.6, async function(dataUrl) {
-    appState.settings.bgImage = dataUrl;
-    try { localStorage.setItem('pf_bgImage_v2', dataUrl); } catch(e){}
-    applyTheme();
-    if (firestore) {
-      try { await firestore.collection('settings').doc('global').set({ bgImage: dataUrl }, { merge: true }); } catch (e) {}
-    }
-    alert('Fond d\'écran d\'accueil mis à jour avec succès ! 🖼️');
-  });
-}
-
-function uploadLeagueBgFromFile(event, leagueKey) {
-  const file = event.target.files[0];
-  if (!file) return;
-  compressAndReadFile(file, 1200, 0.6, async function(dataUrl) {
-    if (!appState.settings.leagueBackgrounds) appState.settings.leagueBackgrounds = {};
-    appState.settings.leagueBackgrounds[leagueKey] = dataUrl;
-    try { localStorage.setItem('pf_backgrounds_v2', JSON.stringify(appState.settings.leagueBackgrounds)); } catch(e){}
-    applyTheme();
-    renderAdminLeagueBackgrounds();
-    if (firestore) {
-      try { await firestore.collection('settings').doc('global').set({ leagueBackgrounds: appState.settings.leagueBackgrounds }, { merge: true }); } catch (e) {}
-    }
-    alert(`Arrière-plan mis à jour pour ${LEAGUE_INFO[leagueKey].name} ! 🏟️`);
-  });
-}
-
-function uploadBannerFromFile(event, leagueKey) {
-  const file = event.target.files[0];
-  if (!file) return;
-  compressAndReadFile(file, 1000, 0.6, async function(dataUrl) {
-    if (!appState.settings.leagueBanners) appState.settings.leagueBanners = {};
-    appState.settings.leagueBanners[leagueKey] = dataUrl;
-    try { localStorage.setItem('pf_banners_v2', JSON.stringify(appState.settings.leagueBanners)); } catch(e){}
-    renderMatches();
-    renderAdminLeagueBanners();
-    if (firestore) {
-      try { await firestore.collection('settings').doc('global').set({ leagueBanners: appState.settings.leagueBanners }, { merge: true }); } catch (e) {}
-    }
-    alert(`Bannière mise à jour pour ${LEAGUE_INFO[leagueKey].name} ! ⚽`);
-  });
-}
-
-function renderAdminMatchList() {
-  let html = '';
-  ALL_MATCHES.slice(0, 50).forEach(m => {
-    const s = appState.scores[m.id];
-    const li = LEAGUE_INFO[m.league] || { flag:'⚽' };
-    html += `
-      <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);flex-wrap:wrap">
-        <span style="font-size:0.75rem;color:var(--text-dim);min-width:70px">${m.date}</span>
-        <span>${li.flag}</span>
-        <span style="flex:1;font-size:0.85rem;min-width:140px">${m.home} vs ${m.away}</span>
-        <input type="number" min="0" max="15" value="${s?s.h:''}" id="ah_${m.id}" placeholder="H" style="width:38px;padding:5px;text-align:center;background:var(--bg-dark);border:1px solid var(--border);color:white;border-radius:4px;font-weight:bold">
-        <span>-</span>
-        <input type="number" min="0" max="15" value="${s?s.a:''}" id="aa_${m.id}" placeholder="A" style="width:38px;padding:5px;text-align:center;background:var(--bg-dark);border:1px solid var(--border);color:white;border-radius:4px;font-weight:bold">
-        <button class="btn btn-primary btn-xs" onclick="adminSaveScore('${m.id}')">Valider</button>
-        <span style="font-size:0.75rem;font-weight:bold;color:${s?'var(--green)':'var(--text-dim)'}">${s?'✅':'⏳'}</span>
-      </div>`;
-  });
-  document.getElementById('adminMatchList').innerHTML = html;
-}
-
-async function adminSaveScore(id) {
-  const h = parseInt(document.getElementById('ah_' + id)?.value);
-  const a = parseInt(document.getElementById('aa_' + id)?.value);
-  if (isNaN(h) || isNaN(a)) { alert('Entrez les 2 scores !'); return; }
-  appState.scores[id] = { h, a };
-  localStorage.setItem('pf_scores_v3', JSON.stringify(appState.scores));
-
-  if (firestore) {
-    try { await firestore.collection('settings').doc('global').set({ scores: appState.scores }, { merge: true }); } catch (e) {}
-  }
-
-  recalculateAllCloudPoints();
-  updateUI();
-  renderMatches();
-  renderLeaderboard();
-  renderDashboardLeaderboard();
-  renderAdminMatchList();
-  renderAdminStats();
-  alert('Score enregistré et points recalculés ! ⚡');
-}
-
-async function adminSimulateScores() {
-  let c = 0;
-  ALL_MATCHES.filter(m => !appState.scores[m.id]).slice(0, 10).forEach(m => {
-    appState.scores[m.id] = { h: Math.floor(Math.random()*4), a: Math.floor(Math.random()*3) };
-    c++;
-  });
-  localStorage.setItem('pf_scores_v3', JSON.stringify(appState.scores));
-  if (firestore) {
-    try { await firestore.collection('settings').doc('global').set({ scores: appState.scores }, { merge: true }); } catch (e) {}
-  }
-  recalculateAllCloudPoints();
-  updateUI();
-  renderMatches();
-  renderLeaderboard();
-  renderDashboardLeaderboard();
-  renderAdminMatchList();
-  renderAdminStats();
-  alert(`${c} scores simulés ! 🎲`);
-}
-
-async function adminSimulateAll() {
-  if (!confirm('Simuler TOUS les matchs ?')) return;
-  ALL_MATCHES.forEach(m => {
-    if (!appState.scores[m.id]) appState.scores[m.id] = { h: Math.floor(Math.random()*4), a: Math.floor(Math.random()*3) };
-  });
-  localStorage.setItem('pf_scores_v3', JSON.stringify(appState.scores));
-  if (firestore) {
-    try { await firestore.collection('settings').doc('global').set({ scores: appState.scores }, { merge: true }); } catch (e) {}
-  }
-  recalculateAllCloudPoints();
-  updateUI();
-  renderMatches();
-  renderLeaderboard();
-  renderDashboardLeaderboard();
-  renderAdminMatchList();
-  renderAdminStats();
-  alert('Tous les matchs ont été simulés ! 🏆');
-}
-
-async function adminResetScores() {
-  if (!confirm('Supprimer tous les scores ?')) return;
-  appState.scores = {};
-  localStorage.setItem('pf_scores_v3', JSON.stringify(appState.scores));
-  if (firestore) {
-    try { await firestore.collection('settings').doc('global').set({ scores: {} }, { merge: true }); } catch (e) {}
-  }
-  recalculateAllCloudPoints();
-  updateUI();
-  renderMatches();
-  renderLeaderboard();
-  renderDashboardLeaderboard();
-  renderAdminMatchList();
-  renderAdminStats();
-  alert('Scores réinitialisés ! 🗑️');
-}
-
-function renderAdminStats() {
-  const t = ALL_MATCHES.length;
-  const s = Object.keys(appState.scores).length;
-  const p = appState.users.reduce((a, u) => a + Object.keys(u.preds || {}).length, 0);
-  document.getElementById('adminStats').innerHTML = `
-    <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)"><span>Matchs 2026-27</span><strong>${t}</strong></div>
-    <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)"><span>Scores validés</span><strong style="color:var(--green)">${s}</strong></div>
-    <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)"><span>Joueurs inscrits</span><strong>${appState.users.length}</strong></div>
-    <div style="display:flex;justify-content:space-between;padding:6px 0"><span>Pronostics totaux</span><strong style="color:var(--gold)">${p}</strong></div>`;
-}
-
-function renderAdminLeagueBackgrounds() {
-  const container = document.getElementById('adminLeagueBackgrounds');
-  if (!container) return;
-  let html = '';
-  for (const [key, li] of Object.entries(LEAGUE_INFO)) {
-    const url = (appState.settings.leagueBackgrounds && appState.settings.leagueBackgrounds[key]) || li.defaultBg;
-    html += `
-      <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);flex-wrap:wrap">
-        <span style="min-width:140px;font-weight:600">${li.flag} ${li.name}</span>
-        <label style="background:var(--accent);color:white;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:bold">
-          📁 Fond PC
-          <input type="file" accept="image/*" style="display:none" onchange="uploadLeagueBgFromFile(event, '${key}')">
-        </label>
-        <img src="${url}" style="width:70px;height:40px;object-fit:cover;border-radius:4px;border:1px solid var(--border)">
-      </div>`;
-  }
-  container.innerHTML = html;
-}
-
-function renderAdminLeagueBanners() {
-  const container = document.getElementById('adminLeagueBanners');
-  if (!container) return;
-  let html = '';
-  for (const [key, li] of Object.entries(LEAGUE_INFO)) {
-    const url = (appState.settings.leagueBanners && appState.settings.leagueBanners[key]) || li.defaultBanner;
-    html += `
-      <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);flex-wrap:wrap">
-        <span style="min-width:140px;font-weight:600">${li.flag} ${li.name}</span>
-        <label style="background:var(--accent);color:white;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:bold">
-          📁 Bannière PC
-          <input type="file" accept="image/*" style="display:none" onchange="uploadBannerFromFile(event, '${key}')">
-        </label>
-        <img src="${url}" style="width:70px;height:40px;object-fit:cover;border-radius:4px;border:1px solid var(--border)">
-      </div>`;
-  }
-  container.innerHTML = html;
-}
-
-async function adminPublishAnnouncement() {
-  const t = document.getElementById('adminAnnounceInput').value.trim();
-  if (!t) return;
-  appState.settings.announce = t;
-  if (firestore) {
-    try { await firestore.collection('settings').doc('global').set({ announce: t }, { merge: true }); } catch (e) {}
-  }
-  alert('Annonce publiée ! 📢');
-}
-
-async function changeTheme(c) {
-  appState.settings.themeColor = c;
-  if (firestore) {
-    try { await firestore.collection('settings').doc('global').set({ themeColor: c }, { merge: true }); } catch (e) {}
-  }
-  applyTheme();
-}
-
-function filterLeague(l) {
-  currentLeague = l;
-  applyTheme();
-  const matchesTitle = document.getElementById('matchesSectionTitle');
-  if (l === 'all') matchesTitle.textContent = "⚽ Calendrier 2026-27";
-  else if (LEAGUE_INFO[l]) matchesTitle.textContent = `${LEAGUE_INFO[l].flag} Calendrier ${LEAGUE_INFO[l].name}`;
-  document.querySelectorAll('#page-matches .league-tab').forEach(t => t.classList.remove('active'));
-  if (event && event.target) event.target.classList.add('active');
-  renderMatches();
-}
-
-function filterByMonth(m) {
-  currentMonth = m;
-  document.querySelectorAll('#monthFilterBar .matchday-pill').forEach(b => b.classList.remove('active'));
-  if (event && event.target) event.target.classList.add('active');
-  renderMatches();
-}
-
+// NAVIGATION SÉCURISÉE STRICTEMENT DÉFENDUE
 function navigateTo(p) {
+  // BLOQUER L'ACCÈS À L'ADMIN SI LE JOUEUR N'EST PAS ADMIN
+  if (p === 'admin') {
+    if (!currentUser || currentUser.role !== 'admin') {
+      alert("⛔ Accès refusé ! Cette section est strictement réservée à l'administrateur du site.");
+      return;
+    }
+  }
+
   if (p !== 'matches') {
     currentLeague = 'all';
     applyTheme();
   }
+
   document.querySelectorAll('.page-section').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.bottom-nav-item').forEach(b => b.classList.remove('active'));
   const page = document.getElementById('page-' + p);
   if (page) page.classList.add('active');
   const btn = document.querySelector(`[onclick="navigateTo('${p}')"]`);
   if (btn) btn.classList.add('active');
-  if (p === 'admin') { renderAdminMatchList(); renderAdminStats(); renderAdminLeagueBanners(); renderAdminLeagueBackgrounds(); }
+  if (p === 'admin') { renderAdminMatchList(); renderAdminStats(); }
   if (p === 'leaderboard') renderLeaderboard();
   if (p === 'groups') renderGroups();
   if (p === 'chat') renderGlobalChat();

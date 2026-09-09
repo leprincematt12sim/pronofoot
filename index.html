@@ -11,12 +11,12 @@
 </head>
 <body>
 
-  <!-- CONNEXION / INSCRIPTION -->
+  <!-- CONNEXION / INSCRIPTION SÉCURISÉE (AUCUN ACCÈS ADMIN EN UN CLIC) -->
   <div class="auth-overlay" id="authScreen" style="display:none">
     <div class="auth-card">
       <div class="auth-header">
         <h1>⚽ PronoFoot</h1>
-        <p>Saison 2026-27 — Multijoueur en Direct</p>
+        <p>Saison 2026-27 — Pronostics entre Amis</p>
       </div>
 
       <div class="auth-tabs">
@@ -26,13 +26,14 @@
 
       <div id="authError" style="color:var(--accent);font-size:0.85rem;margin-bottom:12px;display:none"></div>
 
+      <!-- Formulaire Connexion -->
       <form id="loginForm" onsubmit="handleLogin(event)">
         <div class="form-group"><label>📧 Adresse Email</label><input type="email" id="loginEmail" placeholder="ton@email.com" required></div>
         <div class="form-group"><label>🔒 Mot de passe</label><input type="password" id="loginPass" placeholder="••••••••" required></div>
         <button type="submit" class="btn btn-primary" style="width:100%;margin-top:10px" id="loginBtn">Se connecter →</button>
-        <button type="button" class="btn btn-gold btn-sm" style="width:100%;margin-top:12px" onclick="quickAdminLogin()">⭐ Se connecter en ADMIN</button>
       </form>
 
+      <!-- Formulaire Inscription -->
       <form id="registerForm" style="display:none" onsubmit="handleRegister(event)">
         <div class="form-group"><label>👤 Pseudo de joueur</label><input type="text" id="regUser" placeholder="Ex: Mathis_92" required minlength="3"></div>
         <div class="form-group"><label>📧 Adresse Email</label><input type="email" id="regEmail" placeholder="ton@email.com" required></div>
@@ -65,14 +66,13 @@
 
     <div class="main-content">
 
-      <!-- 1. DASHBOARD VIRAL -->
+      <!-- 1. DASHBOARD -->
       <div class="page-section active" id="page-dashboard">
         <div class="welcome-banner">
           <h2 id="welcomeMsg">Bienvenue ! 👋</h2>
           <p>Pronostique les matchs de la saison 2026-27 et grimpe au sommet !</p>
         </div>
 
-        <!-- MINE DU ROI DE LA SEMAINE (VIRAL) -->
         <div id="kingBannerBox" class="king-banner">
           <div style="font-size:2.5rem">👑</div>
           <div>
@@ -93,7 +93,6 @@
           <div class="stat-card"><div class="val" id="statExact">0</div><div class="lbl">Scores Exacts (+5)</div></div>
         </div>
 
-        <!-- BOUTON DÉFI VIRAL WHATSAPP -->
         <div style="margin-bottom:20px">
           <button class="btn btn-whatsapp" style="width:100%;padding:14px;font-size:1rem;margin-bottom:10px" onclick="shareChallengeWhatsApp()">
             🔥 Défier mes amis sur WhatsApp (Partager mon score)
@@ -254,7 +253,7 @@
         </div>
       </div>
 
-      <!-- 9. ADMIN -->
+      <!-- 9. ADMIN (ACCÈS STRICTEMENT PRIVÉ ET SÉCURISÉ) -->
       <div class="page-section" id="page-admin">
         <h3 class="league-title-special" style="margin-bottom:15px">⚙️ Panneau Administrateur</h3>
         
@@ -314,12 +313,13 @@
 
     </div>
 
+    <!-- FOOTER SANS RACCOURCI ADMIN PUBLIC -->
     <div class="site-footer">
       <p>⚽ PronoFoot — Compétition Européenne 2026-27</p>
       <p style="margin-top:6px">
         <a onclick="navigateTo('rules')">📜 Règles</a> · 
         <a onclick="navigateTo('chat')">💬 Chat Général</a> · 
-        <a onclick="quickAdminLogin()" style="color:var(--gold)">⭐ Espace Admin</a>
+        <a onclick="navigateTo('legal')">🔒 Confidentialité</a>
       </p>
     </div>
   </div>
