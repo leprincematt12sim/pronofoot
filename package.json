@@ -1,6 +1,7 @@
 ﻿{
   "name": "pronofoot",
   "version": "1.0.0",
-  "description": "Pronostics Football Europe 2026-27",
-  "private": true
+  "scripts": {
+    "build": "echo 'Static build complete'"
+  }
 }
