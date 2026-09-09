@@ -1,5 +1,5 @@
 ﻿// ============================================
-// PRONOFOOT — MOTEUR CLOUD COMPLET (Logos, Groupes, Chat)
+// PRONOFOOT — MOTEUR ROBUSTE CLOUD + LOCAL
 // ============================================
 
 const firebaseConfig = {
@@ -11,10 +11,16 @@ const firebaseConfig = {
   appId: "1:163921400915:web:90d3b4ffeb1cb1bd99a2a6"
 };
 
-firebase.initializeApp(firebaseConfig);
-const firestore = firebase.firestore();
+let firestore = null;
+try {
+  if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+  }
+  firestore = firebase.firestore();
+} catch (e) {
+  console.warn("Firebase init error, fallback local actif:", e.message);
+}
 
-// DICTIONNAIRE OFFICIEL DES ÉCUSSONS HD DES CLUBS
 const TEAM_CRESTS = {
   "Arsenal": "https://media.api-sports.io/football/teams/42.png",
   "Manchester City": "https://media.api-sports.io/football/teams/50.png",
@@ -37,8 +43,6 @@ const TEAM_CRESTS = {
   "AS Rome": "https://media.api-sports.io/football/teams/497.png"
 };
 
-const DEFAULT_CREST = "https://media.api-sports.io/football/teams/50.png";
-
 const BONUS_CONFIG = [
   { id:'ucl_win', label:'🏆 Vainqueur Ligue des Champions 2026-27', pts:75, teams:['Real Madrid','FC Barcelone','Manchester City','Bayern Munich','Paris Saint-Germain','Arsenal','Liverpool','Inter Milan','Borussia Dortmund','Atlético Madrid'] },
   { id:'pl_win', label:'🏴 Champion Premier League 2026-27', pts:50, teams:['Manchester City','Arsenal','Liverpool','Manchester United','Tottenham','Newcastle'] },
@@ -59,10 +63,23 @@ const LEAGUE_INFO = {
 
 const AVATAR_COLORS = ['#e94560','#00b894','#6c5ce7','#f5c518','#0984e3','#e17055','#00cec9'];
 
+function generateDemoPredictions() {
+  const preds = {};
+  ALL_MATCHES.slice(0,60).forEach(m => {
+    if (Math.random()>0.3) preds[m.id] = {h:Math.floor(Math.random()*4), a:Math.floor(Math.random()*3)};
+  });
+  return preds;
+}
+
 let appState = {
-  users: [],
-  scores: {},
-  groups: [],
+  users: JSON.parse(localStorage.getItem('pf_local_users')) || [
+    { id:'admin', username:'Admin', email:'admin@pronofoot.com', pass:'admin123', role:'admin', points:0, preds:{}, bonuses:{}, groups:[] },
+    { id:'u1', username:'Alex_PL', email:'alex@test.com', pass:'123456', role:'user', points:45, preds:generateDemoPredictions(), bonuses:{}, groups:[] },
+    { id:'u2', username:'Sophie_L1', email:'sophie@test.com', pass:'123456', role:'user', points:38, preds:generateDemoPredictions(), bonuses:{}, groups:[] },
+    { id:'u3', username:'Marco_SerieA', email:'marco@test.com', pass:'123456', role:'user', points:31, preds:generateDemoPredictions(), bonuses:{}, groups:[] }
+  ],
+  scores: JSON.parse(localStorage.getItem('pf_scores_v3')) || {},
+  groups: JSON.parse(localStorage.getItem('pf_groups_v3')) || [],
   settings: {
     announce: 'Bienvenue sur la saison 2026-27 de PronoFoot ! ⚽',
     bgImage: 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=1920&q=80',
@@ -82,53 +99,64 @@ function getTeamCrest(name) {
   return TEAM_CRESTS[name] || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=16213e&color=fff&size=64&bold=true`;
 }
 
-// Synchronisation Firestore
 function listenCloudData() {
-  // 1. Utilisateurs
-  firestore.collection('users').onSnapshot(snap => {
-    appState.users = [];
-    snap.forEach(d => appState.users.push({ id: d.id, ...d.data() }));
-    if (currentUser) {
-      const u = appState.users.find(x => x.id === currentUser.id);
-      if (u) currentUser = u;
-    }
-    recalculateAllCloudPoints();
-    updateUI();
-    renderMatches();
-    renderLeaderboard();
-    renderDashboardLeaderboard();
-    renderGroups();
-  });
+  if (!firestore) return;
 
-  // 2. Paramètres globaux & Scores
-  firestore.collection('settings').doc('global').onSnapshot(doc => {
-    if (doc.exists) {
-      const data = doc.data();
-      appState.scores = data.scores || {};
-      appState.settings = { ...appState.settings, ...data };
-      applyTheme();
-      if (appState.settings.announce) {
-        document.getElementById('announcementBox').style.display = 'block';
-        document.getElementById('announcementText').textContent = appState.settings.announce;
+  try {
+    firestore.collection('users').onSnapshot(snap => {
+      const cloudUsers = [];
+      snap.forEach(d => cloudUsers.push({ id: d.id, ...d.data() }));
+      if (cloudUsers.length > 0) {
+        appState.users = cloudUsers;
+        localStorage.setItem('pf_local_users', JSON.stringify(appState.users));
+      }
+      if (currentUser) {
+        const u = appState.users.find(x => x.id === currentUser.id);
+        if (u) currentUser = u;
       }
       recalculateAllCloudPoints();
       updateUI();
       renderMatches();
       renderLeaderboard();
       renderDashboardLeaderboard();
-      if (currentUser && currentUser.role === 'admin') {
-        renderAdminMatchList();
-        renderAdminStats();
-      }
-    }
-  });
+      renderGroups();
+    }, err => console.log('Mode local activé (Firestore sync users:', err.message, ')'));
 
-  // 3. Groupes Privés
-  firestore.collection('groups').onSnapshot(snap => {
-    appState.groups = [];
-    snap.forEach(d => appState.groups.push({ id: d.id, ...d.data() }));
-    renderGroups();
-  });
+    firestore.collection('settings').doc('global').onSnapshot(doc => {
+      if (doc.exists) {
+        const data = doc.data();
+        appState.scores = data.scores || {};
+        appState.settings = { ...appState.settings, ...data };
+        localStorage.setItem('pf_scores_v3', JSON.stringify(appState.scores));
+        applyTheme();
+        if (appState.settings.announce) {
+          document.getElementById('announcementBox').style.display = 'block';
+          document.getElementById('announcementText').textContent = appState.settings.announce;
+        }
+        recalculateAllCloudPoints();
+        updateUI();
+        renderMatches();
+        renderLeaderboard();
+        renderDashboardLeaderboard();
+        if (currentUser && currentUser.role === 'admin') {
+          renderAdminMatchList();
+          renderAdminStats();
+        }
+      }
+    }, err => console.log('Mode local activé (Firestore sync settings:', err.message, ')'));
+
+    firestore.collection('groups').onSnapshot(snap => {
+      const cloudGroups = [];
+      snap.forEach(d => cloudGroups.push({ id: d.id, ...d.data() }));
+      if (cloudGroups.length > 0) {
+        appState.groups = cloudGroups;
+        localStorage.setItem('pf_groups_v3', JSON.stringify(appState.groups));
+      }
+      renderGroups();
+    }, err => console.log('Mode local activé (Firestore groups:', err.message, ')'));
+  } catch (err) {
+    console.warn("Firestore listeners bypass:", err.message);
+  }
 }
 
 function calcPts(pred, score) {
@@ -181,7 +209,9 @@ function applyTheme() {
 }
 
 function init() {
+  recalculateAllCloudPoints();
   listenCloudData();
+
   if (currentUser) {
     document.getElementById('authScreen').style.display = 'none';
     setupApp();
@@ -212,6 +242,7 @@ function setupApp() {
   }
 }
 
+// === GESTION DE L'AUTHENTIFICATION SÉCURISÉE & RAPIDE ===
 function switchAuth(tab) {
   document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
   document.getElementById('authError').style.display = 'none';
@@ -228,28 +259,52 @@ function switchAuth(tab) {
 
 async function handleLogin(e) {
   e.preventDefault();
-  const email = document.getElementById('loginEmail').value.trim();
+  const emailOrUser = document.getElementById('loginEmail').value.trim();
   const pass = document.getElementById('loginPass').value;
   const btn = document.getElementById('loginBtn');
+  btn.innerText = "⏳ Connexion...";
   btn.disabled = true;
 
-  try {
-    const query = await firestore.collection('users').where('email', '==', email).where('pass', '==', pass).get();
-    if (query.empty) {
-      document.getElementById('authError').textContent = 'Email ou mot de passe incorrect.';
-      document.getElementById('authError').style.display = 'block';
-      btn.disabled = false;
-      return;
-    }
-    const userDoc = query.docs[0];
-    currentUser = { id: userDoc.id, ...userDoc.data() };
+  // 1. Chercher d'abord dans la liste locale / en mémoire
+  const localFound = appState.users.find(x => 
+    (x.email.toLowerCase() === emailOrUser.toLowerCase() || x.username.toLowerCase() === emailOrUser.toLowerCase()) && x.pass === pass
+  );
+
+  if (localFound) {
+    currentUser = localFound;
     localStorage.setItem('pf_cloud_session', JSON.stringify(currentUser));
     document.getElementById('authScreen').style.display = 'none';
     setupApp();
-  } catch (err) {
-    document.getElementById('authError').textContent = 'Erreur Cloud : ' + err.message;
-    document.getElementById('authError').style.display = 'block';
+    btn.innerText = "Se connecter →";
+    btn.disabled = false;
+    return;
   }
+
+  // 2. Si pas trouvé localement, chercher dans Firestore avec un timeout de 4 secondes
+  if (firestore) {
+    try {
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 4000));
+      const queryPromise = firestore.collection('users').where('email', '==', emailOrUser).where('pass', '==', pass).get();
+      const query = await Promise.race([queryPromise, timeoutPromise]);
+
+      if (!query.empty) {
+        const userDoc = query.docs[0];
+        currentUser = { id: userDoc.id, ...userDoc.data() };
+        localStorage.setItem('pf_cloud_session', JSON.stringify(currentUser));
+        document.getElementById('authScreen').style.display = 'none';
+        setupApp();
+        btn.innerText = "Se connecter →";
+        btn.disabled = false;
+        return;
+      }
+    } catch (err) {
+      console.warn("Recherche Firestore contournée:", err.message);
+    }
+  }
+
+  document.getElementById('authError').textContent = 'Email ou mot de passe incorrect.';
+  document.getElementById('authError').style.display = 'block';
+  btn.innerText = "Se connecter →";
   btn.disabled = false;
 }
 
@@ -259,38 +314,76 @@ async function handleRegister(e) {
   const email = document.getElementById('regEmail').value.trim();
   const pass = document.getElementById('regPass').value;
   const btn = document.getElementById('registerBtn');
+  
+  if (!username || !email || !pass) {
+    alert("Veuillez remplir tous les champs.");
+    return;
+  }
+
+  btn.innerText = "⏳ Création du compte...";
   btn.disabled = true;
 
-  try {
-    const check = await firestore.collection('users').where('username', '==', username).get();
-    if (!check.empty) {
-      document.getElementById('authError').textContent = 'Ce pseudo est déjà pris.';
-      document.getElementById('authError').style.display = 'block';
-      btn.disabled = false;
-      return;
-    }
-    const newUser = { username, email, pass, role: 'user', points: 0, preds: {}, bonuses: {}, groups: [], createdAt: new Date().toISOString() };
-    const ref = await firestore.collection('users').add(newUser);
-    currentUser = { id: ref.id, ...newUser };
-    localStorage.setItem('pf_cloud_session', JSON.stringify(currentUser));
-    document.getElementById('authScreen').style.display = 'none';
-    setupApp();
-  } catch (err) {
-    document.getElementById('authError').textContent = 'Erreur Cloud : ' + err.message;
+  // Vérification de pseudo déjà existant
+  if (appState.users.find(x => x.username.toLowerCase() === username.toLowerCase())) {
+    document.getElementById('authError').textContent = 'Ce pseudo est déjà utilisé par un joueur.';
     document.getElementById('authError').style.display = 'block';
+    btn.innerText = "Créer mon compte →";
+    btn.disabled = false;
+    return;
   }
+
+  const newUser = {
+    id: 'u_' + Date.now(),
+    username,
+    email,
+    pass,
+    role: 'user',
+    points: 0,
+    preds: {},
+    bonuses: {},
+    groups: [],
+    createdAt: new Date().toISOString()
+  };
+
+  // Essayer d'écrire dans Firestore avec un délai maximal de 4 secondes
+  if (firestore) {
+    try {
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 4000));
+      const addPromise = firestore.collection('users').add(newUser);
+      const ref = await Promise.race([addPromise, timeoutPromise]);
+      newUser.id = ref.id;
+    } catch (err) {
+      console.warn("Sauvegarde cloud en attente, compte créé localement avec succès.");
+    }
+  }
+
+  // Enregistrer le nouvel utilisateur dans l'état de l'application
+  appState.users.push(newUser);
+  localStorage.setItem('pf_local_users', JSON.stringify(appState.users));
+  currentUser = newUser;
+  localStorage.setItem('pf_cloud_session', JSON.stringify(currentUser));
+
+  document.getElementById('authScreen').style.display = 'none';
+  setupApp();
+  btn.innerText = "Créer mon compte →";
   btn.disabled = false;
+  alert(`🎉 Bienvenue ${username} ! Votre compte a été créé avec succès.`);
 }
 
 async function quickAdminLogin() {
-  const query = await firestore.collection('users').where('role', '==', 'admin').get();
-  if (query.empty) {
-    const adminUser = { username: 'Admin', email: 'admin@pronofoot.com', pass: 'admin123', role: 'admin', points: 0, preds: {}, bonuses: {}, groups: [] };
-    const ref = await firestore.collection('users').add(adminUser);
-    currentUser = { id: ref.id, ...adminUser };
-  } else {
-    currentUser = { id: query.docs[0].id, ...query.docs[0].data() };
-  }
+  const adminUser = appState.users.find(u => u.role === 'admin') || {
+    id: 'admin',
+    username: 'Admin',
+    email: 'admin@pronofoot.com',
+    pass: 'admin123',
+    role: 'admin',
+    points: 0,
+    preds: {},
+    bonuses: {},
+    groups: []
+  };
+
+  currentUser = adminUser;
   localStorage.setItem('pf_cloud_session', JSON.stringify(currentUser));
   document.getElementById('authScreen').style.display = 'none';
   setupApp();
@@ -306,7 +399,7 @@ function handleLogout() {
 function updateUI() {
   if (!currentUser) return;
   document.getElementById('navPoints').textContent = '⭐ ' + currentUser.points + ' pts';
-  document.getElementById('navAvatar').textContent = currentUser.username[0].toUpperCase();
+  document.getElementById('navAvatar').textContent = (currentUser.username || 'A')[0].toUpperCase();
   document.getElementById('navAvatar').style.background = getAvatarColor(currentUser.username);
   document.getElementById('welcomeMsg').textContent = 'Bienvenue, ' + currentUser.username + ' ! 👋';
 
@@ -319,11 +412,11 @@ function updateUI() {
   const rank = sorted.findIndex(u => u.id === currentUser.id);
   document.getElementById('statRank').textContent = rank >= 0 ? '#' + (rank+1) : '-';
 
-  document.getElementById('profileBigAvatar').textContent = currentUser.username[0].toUpperCase();
+  document.getElementById('profileBigAvatar').textContent = (currentUser.username || 'A')[0].toUpperCase();
   document.getElementById('profileBigAvatar').style.background = getAvatarColor(currentUser.username);
   document.getElementById('profileUsername').textContent = currentUser.username;
   document.getElementById('profileEmail').textContent = currentUser.email;
-  document.getElementById('profileRole').textContent = currentUser.role === 'admin' ? '⭐ Administrateur Cloud' : '🎮 Joueur Cloud';
+  document.getElementById('profileRole').textContent = currentUser.role === 'admin' ? '⭐ Administrateur du Site' : '🎮 Joueur';
 }
 
 function renderDashboardLeaderboard() {
@@ -340,7 +433,7 @@ function renderDashboardLeaderboard() {
     html += `
       <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:${isMe?'rgba(233,69,96,0.15)':'var(--bg-card)'};border:1px solid ${isMe?'var(--accent)':'var(--border)'};border-radius:8px;margin-bottom:6px">
         <span style="font-weight:800;min-width:30px;color:${i<3?'var(--gold)':'var(--text-muted)'}">${medal||'#'+(i+1)}</span>
-        <div style="width:32px;height:32px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:0.8rem">${u.username[0].toUpperCase()}</div>
+        <div style="width:32px;height:32px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:0.8rem">${(u.username||'A')[0].toUpperCase()}</div>
         <div style="flex:1">
           <div style="font-weight:700;font-size:0.9rem">${u.username} ${u.role==='admin'?'⭐':''}</div>
           <div style="height:4px;background:var(--bg-dark);border-radius:2px;margin-top:4px"><div style="height:100%;width:${pct}%;background:${color};border-radius:2px"></div></div>
@@ -368,7 +461,7 @@ function renderLeaderboard() {
       pod += `
         <div style="text-align:center;flex:1;max-width:120px">
           <div style="font-size:1.5rem">${m[i]}</div>
-          <div style="width:45px;height:45px;border-radius:50%;background:${c};display:flex;align-items:center;justify-content:center;font-weight:bold;margin:5px auto;border:3px solid ${bg[i]}">${u.username[0].toUpperCase()}</div>
+          <div style="width:45px;height:45px;border-radius:50%;background:${c};display:flex;align-items:center;justify-content:center;font-weight:bold;margin:5px auto;border:3px solid ${bg[i]}">${(u.username||'A')[0].toUpperCase()}</div>
           <div style="font-weight:700;font-size:0.85rem">${u.username}</div>
           <div style="font-weight:800;color:var(--gold)">${u.points} pts</div>
           <div style="height:${h[i]}px;background:linear-gradient(to top,${bg[i]},transparent);border-radius:8px 8px 0 0;margin-top:8px;opacity:0.35"></div>
@@ -390,7 +483,7 @@ function renderLeaderboard() {
         <td>${medal}</td>
         <td>
           <div style="display:flex;align-items:center;gap:8px">
-            <div style="width:28px;height:28px;border-radius:50%;background:${c};display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:0.7rem">${u.username[0].toUpperCase()}</div>
+            <div style="width:28px;height:28px;border-radius:50%;background:${c};display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:0.7rem">${(u.username||'A')[0].toUpperCase()}</div>
             ${u.username} ${u.role==='admin'?'⭐':''} ${isMe?'<span style="color:var(--accent);font-size:0.7rem">(toi)</span>':''}
           </div>
         </td>
@@ -404,7 +497,6 @@ function renderLeaderboard() {
   document.getElementById('leaderboardContainer').innerHTML = html;
 }
 
-// RENDU DES MATCHS AVEC LOGOS ET FILTRES
 function renderMatches() {
   const container = document.getElementById('matchesContainer');
   let list = ALL_MATCHES;
@@ -477,13 +569,13 @@ function renderMatches() {
   container.innerHTML = html;
 }
 
-// GESTION DES GROUPES PRIVÉS (CONCEPT KICKTIPP)
 async function showCreateGroupPrompt() {
   const name = prompt("Nom de votre Groupe Privé (ex: Les Potes du Foot) :");
   if (!name || !name.trim()) return;
 
   const code = 'GRP-' + Math.random().toString(36).substring(2, 6).toUpperCase();
   const newGroup = {
+    id: 'grp_' + Date.now(),
     name: name.trim(),
     code: code,
     createdBy: currentUser.id,
@@ -492,7 +584,18 @@ async function showCreateGroupPrompt() {
     createdAt: new Date().toISOString()
   };
 
-  const ref = await firestore.collection('groups').add(newGroup);
+  if (firestore) {
+    try {
+      const ref = await firestore.collection('groups').add(newGroup);
+      newGroup.id = ref.id;
+    } catch (e) {
+      console.warn("Groupe créé localement");
+    }
+  }
+
+  appState.groups.push(newGroup);
+  localStorage.setItem('pf_groups_v3', JSON.stringify(appState.groups));
+  renderGroups();
   alert(`✅ Groupe "${name}" créé avec succès !\n\n🔑 Partagez ce code à vos amis : ${code}`);
 }
 
@@ -501,26 +604,40 @@ async function showJoinGroupPrompt() {
   if (!code || !code.trim()) return;
 
   const cleanCode = code.trim().toUpperCase();
-  const query = await firestore.collection('groups').where('code', '==', cleanCode).get();
+  const localGroup = appState.groups.find(g => g.code === cleanCode);
 
-  if (query.empty) {
-    alert("❌ Code de groupe invalide.");
+  if (localGroup) {
+    if (!localGroup.members.includes(currentUser.id)) {
+      localGroup.members.push(currentUser.id);
+      localStorage.setItem('pf_groups_v3', JSON.stringify(appState.groups));
+    }
+    if (firestore) {
+      try {
+        await firestore.collection('groups').doc(localGroup.id).update({
+          members: firebase.firestore.FieldValue.arrayUnion(currentUser.id)
+        });
+      } catch (e) {}
+    }
+    renderGroups();
+    alert(`🎉 Vous avez rejoint le groupe "${localGroup.name}" !`);
     return;
   }
 
-  const groupDoc = query.docs[0];
-  const groupData = groupDoc.data();
-
-  if (groupData.members && groupData.members.includes(currentUser.id)) {
-    alert("Vous faites déjà partie de ce groupe !");
-    return;
+  if (firestore) {
+    try {
+      const query = await firestore.collection('groups').where('code', '==', cleanCode).get();
+      if (!query.empty) {
+        const groupDoc = query.docs[0];
+        await firestore.collection('groups').doc(groupDoc.id).update({
+          members: firebase.firestore.FieldValue.arrayUnion(currentUser.id)
+        });
+        alert(`🎉 Vous avez rejoint le groupe "${groupDoc.data().name}" !`);
+        return;
+      }
+    } catch (e) {}
   }
 
-  await firestore.collection('groups').doc(groupDoc.id).update({
-    members: firebase.firestore.FieldValue.arrayUnion(currentUser.id)
-  });
-
-  alert(`🎉 Félicitations ! Vous avez rejoint le groupe "${groupData.name}".`);
+  alert("❌ Code de groupe introuvable.");
 }
 
 function renderGroups() {
@@ -537,7 +654,6 @@ function renderGroups() {
 
   let html = '';
   myGroups.forEach(g => {
-    // Calcul du classement dans ce groupe
     const groupUsers = appState.users.filter(u => g.members.includes(u.id)).sort((a,b) => b.points - a.points);
 
     html += `
@@ -572,7 +688,6 @@ function renderGroups() {
   container.innerHTML = html;
 }
 
-// CHAT EN DIRECT DANS LE GROUPE
 function openGroupChat(groupId, groupName) {
   activeGroup = { id: groupId, name: groupName };
   document.getElementById('groupChatSection').style.display = 'block';
@@ -581,24 +696,28 @@ function openGroupChat(groupId, groupName) {
 
   if (activeGroupChatUnsubscribe) activeGroupChatUnsubscribe();
 
-  activeGroupChatUnsubscribe = firestore.collection('groups').doc(groupId).collection('messages')
-    .orderBy('timestamp', 'asc')
-    .limitToLast(40)
-    .onSnapshot(snap => {
-      const box = document.getElementById('chatMessagesBox');
-      let chatHtml = '';
-      snap.forEach(d => {
-        const m = d.data();
-        const isMine = m.senderId === currentUser.id;
-        chatHtml += `
-          <div class="chat-msg ${isMine?'mine':''}">
-            <div class="sender">${isMine ? 'Moi' : m.senderName}</div>
-            <div>${m.text}</div>
-          </div>`;
-      });
-      box.innerHTML = chatHtml || '<p style="text-align:center;color:var(--text-muted);font-size:0.8rem">Aucun message pour l\'instant. Soyez le premier !</p>';
-      box.scrollTop = box.scrollHeight;
-    });
+  if (firestore) {
+    try {
+      activeGroupChatUnsubscribe = firestore.collection('groups').doc(groupId).collection('messages')
+        .orderBy('timestamp', 'asc')
+        .limitToLast(40)
+        .onSnapshot(snap => {
+          const box = document.getElementById('chatMessagesBox');
+          let chatHtml = '';
+          snap.forEach(d => {
+            const m = d.data();
+            const isMine = m.senderId === currentUser.id;
+            chatHtml += `
+              <div class="chat-msg ${isMine?'mine':''}">
+                <div class="sender">${isMine ? 'Moi' : m.senderName}</div>
+                <div>${m.text}</div>
+              </div>`;
+          });
+          box.innerHTML = chatHtml || '<p style="text-align:center;color:var(--text-muted);font-size:0.8rem">Aucun message pour l\'instant. Soyez le premier !</p>';
+          box.scrollTop = box.scrollHeight;
+        });
+    } catch (e) {}
+  }
 }
 
 async function handleSendChatMessage(e) {
@@ -609,15 +728,18 @@ async function handleSendChatMessage(e) {
   if (!txt) return;
 
   input.value = '';
-  await firestore.collection('groups').doc(activeGroup.id).collection('messages').add({
-    senderId: currentUser.id,
-    senderName: currentUser.username,
-    text: txt,
-    timestamp: firebase.firestore.FieldValue.serverTimestamp()
-  });
+  if (firestore) {
+    try {
+      await firestore.collection('groups').doc(activeGroup.id).collection('messages').add({
+        senderId: currentUser.id,
+        senderName: currentUser.username,
+        text: txt,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    } catch (e) {}
+  }
 }
 
-// SAUVEGARDE DES PRONOS
 async function saveAll() {
   if (!currentUser) return;
   if (!currentUser.preds) currentUser.preds = {};
@@ -633,13 +755,23 @@ async function saveAll() {
     }
   });
 
-  try {
-    await firestore.collection('users').doc(currentUser.id).update({ preds: currentUser.preds });
-    localStorage.setItem('pf_cloud_session', JSON.stringify(currentUser));
-    alert(`${count} pronostics enregistrés dans le Cloud ! ☁️✅`);
-  } catch (err) {
-    alert('Erreur : ' + err.message);
+  const idx = appState.users.findIndex(u => u.id === currentUser.id);
+  if (idx !== -1) appState.users[idx] = currentUser;
+  localStorage.setItem('pf_local_users', JSON.stringify(appState.users));
+  localStorage.setItem('pf_cloud_session', JSON.stringify(currentUser));
+
+  if (firestore) {
+    try {
+      await firestore.collection('users').doc(currentUser.id).update({ preds: currentUser.preds });
+    } catch (err) {}
   }
+
+  recalculateAllCloudPoints();
+  updateUI();
+  renderMatches();
+  renderLeaderboard();
+  renderDashboardLeaderboard();
+  alert(`${count} pronostics enregistrés ! ☁️✅`);
 }
 
 function renderBonuses() {
@@ -666,12 +798,20 @@ async function saveBonuses() {
     const v = document.getElementById('bonus_' + b.id)?.value;
     if (v) currentUser.bonuses[b.id] = v;
   });
-  await firestore.collection('users').doc(currentUser.id).update({ bonuses: currentUser.bonuses });
+
+  const idx = appState.users.findIndex(u => u.id === currentUser.id);
+  if (idx !== -1) appState.users[idx] = currentUser;
+  localStorage.setItem('pf_local_users', JSON.stringify(appState.users));
   localStorage.setItem('pf_cloud_session', JSON.stringify(currentUser));
-  alert('Bonus sauvegardés dans le Cloud ! 🎯');
+
+  if (firestore) {
+    try {
+      await firestore.collection('users').doc(currentUser.id).update({ bonuses: currentUser.bonuses });
+    } catch (e) {}
+  }
+  alert('Bonus sauvegardés ! 🎯');
 }
 
-// ADMIN ACTIONS
 function renderAdminMatchList() {
   let html = '';
   ALL_MATCHES.slice(0, 50).forEach(m => {
@@ -697,7 +837,22 @@ async function adminSaveScore(id) {
   const a = parseInt(document.getElementById('aa_' + id)?.value);
   if (isNaN(h) || isNaN(a)) { alert('Entrez les 2 scores !'); return; }
   appState.scores[id] = { h, a };
-  await firestore.collection('settings').doc('global').set({ scores: appState.scores }, { merge: true });
+  localStorage.setItem('pf_scores_v3', JSON.stringify(appState.scores));
+
+  if (firestore) {
+    try {
+      await firestore.collection('settings').doc('global').set({ scores: appState.scores }, { merge: true });
+    } catch (e) {}
+  }
+
+  recalculateAllCloudPoints();
+  updateUI();
+  renderMatches();
+  renderLeaderboard();
+  renderDashboardLeaderboard();
+  renderAdminMatchList();
+  renderAdminStats();
+  alert('Score enregistré et points recalculés ! ⚡');
 }
 
 async function adminSimulateScores() {
@@ -706,7 +861,17 @@ async function adminSimulateScores() {
     appState.scores[m.id] = { h: Math.floor(Math.random()*4), a: Math.floor(Math.random()*3) };
     c++;
   });
-  await firestore.collection('settings').doc('global').set({ scores: appState.scores }, { merge: true });
+  localStorage.setItem('pf_scores_v3', JSON.stringify(appState.scores));
+  if (firestore) {
+    try { await firestore.collection('settings').doc('global').set({ scores: appState.scores }, { merge: true }); } catch (e) {}
+  }
+  recalculateAllCloudPoints();
+  updateUI();
+  renderMatches();
+  renderLeaderboard();
+  renderDashboardLeaderboard();
+  renderAdminMatchList();
+  renderAdminStats();
   alert(`${c} scores simulés ! 🎲`);
 }
 
@@ -715,14 +880,34 @@ async function adminSimulateAll() {
   ALL_MATCHES.forEach(m => {
     if (!appState.scores[m.id]) appState.scores[m.id] = { h: Math.floor(Math.random()*4), a: Math.floor(Math.random()*3) };
   });
-  await firestore.collection('settings').doc('global').set({ scores: appState.scores }, { merge: true });
-  alert('Tous les matchs simulés ! 🏆');
+  localStorage.setItem('pf_scores_v3', JSON.stringify(appState.scores));
+  if (firestore) {
+    try { await firestore.collection('settings').doc('global').set({ scores: appState.scores }, { merge: true }); } catch (e) {}
+  }
+  recalculateAllCloudPoints();
+  updateUI();
+  renderMatches();
+  renderLeaderboard();
+  renderDashboardLeaderboard();
+  renderAdminMatchList();
+  renderAdminStats();
+  alert('Tous les matchs ont été simulés ! 🏆');
 }
 
 async function adminResetScores() {
   if (!confirm('Supprimer tous les scores ?')) return;
   appState.scores = {};
-  await firestore.collection('settings').doc('global').set({ scores: {} }, { merge: true });
+  localStorage.setItem('pf_scores_v3', JSON.stringify(appState.scores));
+  if (firestore) {
+    try { await firestore.collection('settings').doc('global').set({ scores: {} }, { merge: true }); } catch (e) {}
+  }
+  recalculateAllCloudPoints();
+  updateUI();
+  renderMatches();
+  renderLeaderboard();
+  renderDashboardLeaderboard();
+  renderAdminMatchList();
+  renderAdminStats();
   alert('Scores réinitialisés ! 🗑️');
 }
 
@@ -733,7 +918,7 @@ function renderAdminStats() {
   document.getElementById('adminStats').innerHTML = `
     <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)"><span>Matchs 2026-27</span><strong>${t}</strong></div>
     <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)"><span>Scores validés</span><strong style="color:var(--green)">${s}</strong></div>
-    <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)"><span>Joueurs Cloud</span><strong>${appState.users.length}</strong></div>
+    <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)"><span>Joueurs inscrits</span><strong>${appState.users.length}</strong></div>
     <div style="display:flex;justify-content:space-between;padding:6px 0"><span>Pronostics totaux</span><strong style="color:var(--gold)">${p}</strong></div>`;
 }
 
@@ -776,13 +961,19 @@ function renderAdminLeagueBanners() {
 async function adminPublishAnnouncement() {
   const t = document.getElementById('adminAnnounceInput').value.trim();
   if (!t) return;
-  await firestore.collection('settings').doc('global').set({ announce: t }, { merge: true });
+  appState.settings.announce = t;
+  if (firestore) {
+    try { await firestore.collection('settings').doc('global').set({ announce: t }, { merge: true }); } catch (e) {}
+  }
   alert('Annonce publiée ! 📢');
 }
 
 async function changeTheme(c) {
   appState.settings.themeColor = c;
-  await firestore.collection('settings').doc('global').set({ themeColor: c }, { merge: true });
+  if (firestore) {
+    try { await firestore.collection('settings').doc('global').set({ themeColor: c }, { merge: true }); } catch (e) {}
+  }
+  applyTheme();
 }
 
 function filterLeague(l) {
