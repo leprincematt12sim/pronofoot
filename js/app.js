@@ -25,13 +25,14 @@ const TEAM_CRESTS = {
 };
 
 const LEAGUE_INFO = {
-  champions:{ name:'Ligue des Champions', flag:'🏆', accent:'#f5c518', defaultBanner:'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=1200&q=80', defaultBg:'' },
-  premier:{ name:'Premier League', flag:'🏴󠁧󠁢󠁥󠁮󠁧󠁿', accent:'#3d195b', defaultBanner:'https://images.unsplash.com/photo-1522778119026-d647f0596c20?auto=format&fit=crop&w=1200&q=80', defaultBg:'' },
-  laliga:{ name:'La Liga', flag:'🇪🇸', accent:'#ee8707', defaultBanner:'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1200&q=80', defaultBg:'' },
-  seriea:{ name:'Serie A', flag:'🇮🇹', accent:'#024494', defaultBanner:'https://images.unsplash.com/photo-1510566337590-2fc1f21d0faa?auto=format&fit=crop&w=1200&q=80', defaultBg:'' },
-  bundesliga:{ name:'Bundesliga', flag:'🇩🇪', accent:'#d20515', defaultBanner:'https://images.unsplash.com/photo-1489944445391-11dd35572130?auto=format&fit=crop&w=1200&q=80', defaultBg:'' },
-  ligue1:{ name:'Ligue 1', flag:'🇫🇷', accent:'#091c3e', defaultBanner:'https://images.unsplash.com/photo-1517466787929-bc90951d0974?auto=format&fit=crop&w=1200&q=80', defaultBg:'' }
+  champions:{ name:'Ligue des Champions', flag:'🏆', accent:'#f5c518', defaultBanner:'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=1200&q=80', defaultBg:'https://images.unsplash.com/photo-1518091043644-c1d4457512c6?auto=format&fit=crop&w=1920&q=80' },
+  premier:{ name:'Premier League', flag:'🏴󠁧󠁢󠁥󠁮󠁧󠁿', accent:'#3d195b', defaultBanner:'https://images.unsplash.com/photo-1522778119026-d647f0596c20?auto=format&fit=crop&w=1200&q=80', defaultBg:'https://images.unsplash.com/photo-1522778119026-d647f0596c20?auto=format&fit=crop&w=1920&q=80' },
+  laliga:{ name:'La Liga', flag:'🇪🇸', accent:'#ee8707', defaultBanner:'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1200&q=80', defaultBg:'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1920&q=80' },
+  seriea:{ name:'Serie A', flag:'🇮🇹', accent:'#024494', defaultBanner:'https://images.unsplash.com/photo-1510566337590-2fc1f21d0faa?auto=format&fit=crop&w=1200&q=80', defaultBg:'https://images.unsplash.com/photo-1510566337590-2fc1f21d0faa?auto=format&fit=crop&w=1920&q=80' },
+  bundesliga:{ name:'Bundesliga', flag:'🇩🇪', accent:'#d20515', defaultBanner:'https://images.unsplash.com/photo-1489944445391-11dd35572130?auto=format&fit=crop&w=1200&q=80', defaultBg:'https://images.unsplash.com/photo-1489944445391-11dd35572130?auto=format&fit=crop&w=1920&q=80' },
+  ligue1:{ name:'Ligue 1', flag:'🇫🇷', accent:'#091c3e', defaultBanner:'https://images.unsplash.com/photo-1517466787929-bc90951d0974?auto=format&fit=crop&w=1200&q=80', defaultBg:'https://images.unsplash.com/photo-1517466787929-bc90951d0974?auto=format&fit=crop&w=1920&q=80' }
 };
+
 const AVATAR_COLORS = ['#00E676','#00b894','#6c5ce7','#f5c518','#0984e3','#e17055','#00cec9'];
 
 let appState = {
@@ -46,24 +47,13 @@ let currentLeague = 'all';
 let currentMonth = 'all';
 let currentMatchView = 'upcoming';
 
-function getTeamCrest(name) { return TEAM_CRESTS[name] || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=1a1a1c&color=fff&size=64&bold=true`; }
-function getAvatarColor(u) { return AVATAR_COLORS[(u||'A').charCodeAt(0)%AVATAR_COLORS.length]; }
-
-// DÉBLOCAGE ADMIN SECRETS EN 5 CLICS SUR LE LOGO
-let secretClicks = 0;
-function secretAdminUnlock() {
-  secretClicks++;
-  if (secretClicks >= 5 && currentUser) {
-    currentUser.role = 'admin';
-    const idx = appState.users.findIndex(u => u.id === currentUser.id);
-    if (idx !== -1) appState.users[idx].role = 'admin';
-    localStorage.setItem('pf_cloud_session', JSON.stringify(currentUser));
-    if (firestore) firestore.collection('users').doc(currentUser.id).update({ role: 'admin' });
-    alert('🔓 PASS VIP ADMIN ACTIVÉ !');
-    setupApp();
-    secretClicks = 0;
-  }
+// FONCTION SÉCURISÉE DE MAJ TEXTE (S'ASSURE DE NE JAMAIS CRASHER)
+function setText(id, text) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = text;
 }
+
+function getTeamCrest(name) { return TEAM_CRESTS[name] || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=1a1a1c&color=fff&size=64&bold=true`; }
 
 function parseMatchDateTime(dateStr, timeStr = "20:00") {
   if (!dateStr) return new Date(2099, 0, 1);
@@ -72,6 +62,7 @@ function parseMatchDateTime(dateStr, timeStr = "20:00") {
   else if (dateStr.includes('-')) { const p = dateStr.split('-'); y = parseInt(p[0]); m = parseInt(p[1]); d = parseInt(p[2]); }
   return new Date(y, m - 1, d, 20, 0, 0);
 }
+
 function hasMatchStarted(dateStr, timeStr) { return new Date() >= parseMatchDateTime(dateStr, timeStr); }
 
 function compressImage(file, maxWidth, quality, callback) {
@@ -111,6 +102,7 @@ function uploadAuthBgFromFile(event) {
     alert("✅ Fond Connexion OK !");
   });
 }
+
 function uploadDashboardBgFromFile(event) {
   compressImage(event.target.files[0], 800, 0.4, async d => {
     appState.settings.dashboardBgImage = d; applyTheme();
@@ -126,7 +118,7 @@ function listenCloudData() {
     snap.forEach(d => cloudUsers.push({ id: d.id, ...d.data() }));
     if (cloudUsers.length > 0) appState.users = cloudUsers;
     if (currentUser) { const u = appState.users.find(x => x.id === currentUser.id); if (u) currentUser = u; }
-    recalculateAllCloudPoints(); updateUI(); renderMatches(); renderLeaderboard(); renderDashboardLeaderboard(); renderMyPredictions();
+    recalculateAllCloudPoints(); updateUI(); renderMatches(); renderLeaderboard(); renderDashboardLeaderboard();
   });
   firestore.collection('settings').doc('global').onSnapshot(doc => {
     if (doc.exists) {
@@ -134,7 +126,7 @@ function listenCloudData() {
       appState.scores = data.scores || {};
       appState.settings = { ...appState.settings, ...data };
       applyTheme(); recalculateAllCloudPoints(); updateUI(); renderMatches(); renderLeaderboard(); renderDashboardLeaderboard();
-      if (currentUser && currentUser.role === 'admin') { renderAdminMatchList(); renderAdminLeagueBanners(); }
+      if (currentUser && currentUser.role === 'admin') { renderAdminMatchList(); renderAdminLeagueBanners(); renderAdminLeagueBackgrounds(); }
     }
   });
 }
@@ -165,6 +157,7 @@ function getUserStats(u) {
 }
 
 function getSorted() { return [...appState.users].sort((a,b) => b.points - a.points); }
+function getAvatarColor(u) { return AVATAR_COLORS[(u||'A').charCodeAt(0)%AVATAR_COLORS.length]; }
 
 function applyTheme() {
   document.documentElement.style.setProperty('--accent', appState.settings.themeColor || '#00E676');
@@ -172,11 +165,12 @@ function applyTheme() {
   if (authScreen) { authScreen.style.backgroundImage = appState.settings.authBgImage ? `url('${appState.settings.authBgImage}')` : 'none'; authScreen.style.backgroundSize = 'cover'; }
   let bg = appState.settings.bgImage;
   if (currentLeague === 'dashboard' && appState.settings.dashboardBgImage) bg = appState.settings.dashboardBgImage;
+  else if (currentLeague !== 'all' && currentLeague !== 'dashboard' && LEAGUE_INFO[currentLeague]) { bg = (appState.settings.leagueBackgrounds && appState.settings.leagueBackgrounds[currentLeague]) || LEAGUE_INFO[currentLeague].defaultBg; }
   document.documentElement.style.setProperty('--bg-image', bg ? `url('${bg}')` : 'none');
 }
 
 function init() {
-  if (appState.users.length === 0) { appState.users.push({ id:'admin', username:'Admin', email:'admin@pronofoot.com', pass:'admin123', role:'admin', points:0, preds:{} }); }
+  if (appState.users.length === 0) appState.users.push({ id:'admin', username:'Admin', email:'admin@pronofoot.com', pass:'admin123', role:'admin', points:0, preds:{} });
   recalculateAllCloudPoints(); listenCloudData(); setupMonthFilter();
   if (currentUser) { document.getElementById('authScreen').style.display = 'none'; setupApp(); } 
   else { document.getElementById('authScreen').style.display = 'flex'; applyTheme(); }
@@ -187,9 +181,49 @@ function setupApp() {
   if (currentUser && currentUser.role === 'admin') {
     document.getElementById('adminNavBtn').style.display = 'flex';
     document.getElementById('topAdminBtn').style.display = 'block';
-    renderAdminMatchList();
+    renderAdminMatchList(); renderAdminLeagueBackgrounds(); renderAdminLeagueBanners(); renderAdminStats();
   } else {
     document.getElementById('adminNavBtn').style.display = 'none'; document.getElementById('topAdminBtn').style.display = 'none';
+  }
+}
+
+// FONCTION UPDATEUI SÉCURISÉE POUR NE JAMAIS CRASHER
+function updateUI() {
+  if (!currentUser) return;
+  setText('navPoints', (currentUser.points || 0) + ' pts');
+  
+  const navAv = document.getElementById('navAvatar');
+  if (navAv) {
+    if (currentUser.avatar) { navAv.textContent = ''; navAv.style.backgroundImage = `url('${currentUser.avatar}')`; navAv.style.backgroundSize = 'cover'; } 
+    else { navAv.style.backgroundImage = 'none'; navAv.textContent = (currentUser.username || 'A')[0].toUpperCase(); navAv.style.background = getAvatarColor(currentUser.username); }
+  }
+  
+  const st = getUserStats(currentUser);
+  setText('welcomeMsg', 'Bienvenue, ' + currentUser.username + ' ! 👋');
+  setText('statPoints', currentUser.points || 0);
+  setText('statPredictions', st.total);
+  setText('statExact', st.exact);
+  
+  const sorted = getSorted();
+  const rankIdx = sorted.findIndex(u => u.id === currentUser.id);
+  const rankStr = rankIdx >= 0 ? '#' + (rankIdx + 1) : '#1';
+  setText('statRank', rankStr);
+  
+  setText('profileUsername', currentUser.username || '-');
+  setText('profileEmail', currentUser.email || '-');
+  setText('profileRole', currentUser.role === 'admin' ? '⭐ Administrateur' : '🎮 Joueur');
+  setText('profilePoints', currentUser.points || 0);
+  setText('profileRank', rankStr);
+
+  const profAv = document.getElementById('profileBigAvatar');
+  if (profAv) {
+    if (currentUser.avatar) { profAv.textContent = ''; profAv.style.backgroundImage = `url('${currentUser.avatar}')`; profAv.style.backgroundSize = 'cover'; } 
+    else { profAv.style.backgroundImage = 'none'; profAv.textContent = (currentUser.username || 'A')[0].toUpperCase(); }
+  }
+
+  if (sorted[0]) {
+    setText('kingUsername', sorted[0].username + (sorted[0].role === 'admin' ? ' ⭐' : ''));
+    setText('kingPoints', sorted[0].points + ' pts');
   }
 }
 
@@ -243,6 +277,20 @@ async function handleRegister(e) {
   document.getElementById('authScreen').style.display = 'none'; setupApp(); btn.innerText = "Créer mon compte →"; btn.disabled = false;
 }
 
+function secretAdminUnlock() {
+  let clicks = (window.secretClicks || 0) + 1;
+  window.secretClicks = clicks;
+  if (clicks >= 5 && currentUser) {
+    currentUser.role = 'admin';
+    const idx = appState.users.findIndex(u => u.id === currentUser.id);
+    if (idx !== -1) appState.users[idx].role = 'admin';
+    localStorage.setItem('pf_cloud_session', JSON.stringify(currentUser));
+    if (firestore) firestore.collection('users').doc(currentUser.id).update({ role: 'admin' });
+    alert('🔓 PASS VIP ADMIN ACTIVÉ !');
+    setupApp(); window.secretClicks = 0;
+  }
+}
+
 function handleLogout() { localStorage.removeItem('pf_cloud_session'); currentUser = null; location.reload(); }
 function togglePassword(id) { const input = document.getElementById(id); input.type = input.type === "password" ? "text" : "password"; }
 
@@ -255,6 +303,7 @@ function setupMonthFilter() {
 }
 function filterByMonth(m) { currentMonth = m; document.querySelectorAll('#monthFilterBar .matchday-pill').forEach(b => b.classList.remove('active')); if (event && event.target) event.target.classList.add('active'); renderMatches(); }
 function filterLeague(l) { currentLeague = l; applyTheme(); document.querySelectorAll('#page-matches .league-tab').forEach(t => t.classList.remove('active')); if (event && event.target) event.target.classList.add('active'); renderMatches(); }
+function switchMatchView(viewMode) { currentMatchView = viewMode; document.getElementById('btnTabUpcoming').className = viewMode === 'upcoming' ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-secondary'; document.getElementById('btnTabFinished').className = viewMode === 'finished' ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-secondary'; renderMatches(); }
 
 function toggleMatchPredictions(matchId, matchDateStr) {
   const el = document.getElementById('all_preds_' + matchId);
@@ -289,6 +338,9 @@ function renderMatches() {
   let list = ALL_MATCHES;
   if (currentLeague !== 'all') list = list.filter(m => m.league === currentLeague);
   if (currentMonth !== 'all') { list = list.filter(m => { const parts = m.date.split('/'); return parts.length === 3 && parts[1] === currentMonth; }); }
+  if (currentMatchView === 'upcoming') { list = list.filter(m => !appState.scores[m.id] || appState.scores[m.id].status === 'LIVE'); } 
+  else { list = list.filter(m => appState.scores[m.id] && appState.scores[m.id].status !== 'LIVE'); }
+
   if (list.length === 0) { container.innerHTML = '<p style="text-align:center;color:var(--text-muted);padding:40px">Aucun match trouvé pour ce filtre.</p>'; return; }
 
   let html = '';
@@ -312,7 +364,7 @@ function renderMatches() {
       res = `<div class="match-result-badge ${cls}">Score Final : ${score.h} - ${score.a} | ${lbl}</div>`;
     }
 
-    const disableInput = (done) ? 'disabled' : '';
+    const disableInput = (started || done) ? 'disabled' : '';
 
     html += `
       <div class="match-card ${done?'finished':''}">
@@ -370,51 +422,10 @@ function renderMyPredictions() {
       const pts = calcPts(pred, score);
       statusText = `<span class="${pts===5?'pts-exact':pts===3?'pts-correct':'pts-wrong'}">Final: ${score.h}-${score.a} (+${pts} pts)</span>`;
     }
-
-    html += `
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:0.85rem">
-        <div style="flex:1"><strong>${match.home}</strong> vs <strong>${match.away}</strong></div>
-        <div style="background:var(--bg-body);padding:2px 8px;border-radius:4px;font-weight:bold;margin:0 10px">${pred.h} - ${pred.a}</div>
-        <div style="min-width:120px;text-align:right">${statusText}</div>
-      </div>`;
+    html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:0.85rem"><div style="flex:1"><strong>${match.home}</strong> vs <strong>${match.away}</strong></div><div style="background:var(--bg-body);padding:2px 8px;border-radius:4px;font-weight:bold;margin:0 10px">${pred.h} - ${pred.a}</div><div style="min-width:120px;text-align:right">${statusText}</div></div>`;
   }
-  if (count === 0) html = '<p style="text-align:center;color:var(--text-muted)">Aucun pronostic enregistré.</p>';
+  if (count === 0) html = '<p style="text-align:center;color:var(--text-muted)">Vous n\'avez fait aucun pronostic.</p>';
   container.innerHTML = html;
-}
-
-function updateUI() {
-  if (!currentUser) return;
-  document.getElementById('navPoints').textContent = (currentUser.points || 0) + ' pts';
-  const navAv = document.getElementById('navAvatar');
-  if (currentUser.avatar) { navAv.textContent = ''; navAv.style.backgroundImage = `url('${currentUser.avatar}')`; navAv.style.backgroundSize = 'cover'; } 
-  else { navAv.style.backgroundImage = 'none'; navAv.textContent = (currentUser.username || 'A')[0].toUpperCase(); }
-  
-  const st = getUserStats(currentUser);
-  document.getElementById('statPoints').textContent = currentUser.points || 0;
-  document.getElementById('statPredictions').textContent = st.total;
-  document.getElementById('statExact').textContent = st.exact;
-  
-  const sorted = getSorted();
-  const rankIdx = sorted.findIndex(u => u.id === currentUser.id);
-  const rankStr = rankIdx >= 0 ? '#' + (rankIdx + 1) : '#1';
-  document.getElementById('statRank').textContent = rankStr;
-  
-  document.getElementById('profileUsername').textContent = currentUser.username || '-';
-  document.getElementById('profileEmail').textContent = currentUser.email || '-';
-  document.getElementById('profileRole').textContent = currentUser.role === 'admin' ? '⭐ Administrateur' : '🎮 Joueur';
-  document.getElementById('profilePoints').textContent = currentUser.points || 0;
-  document.getElementById('profileRank').textContent = rankStr;
-
-  const profAv = document.getElementById('profileBigAvatar');
-  if (profAv) {
-    if (currentUser.avatar) { profAv.textContent = ''; profAv.style.backgroundImage = `url('${currentUser.avatar}')`; profAv.style.backgroundSize = 'cover'; } 
-    else { profAv.style.backgroundImage = 'none'; profAv.textContent = (currentUser.username || 'A')[0].toUpperCase(); }
-  }
-
-  if (sorted[0]) {
-    document.getElementById('kingUsername').textContent = sorted[0].username;
-    document.getElementById('kingPoints').textContent = sorted[0].points + ' pts';
-  }
 }
 
 function renderDashboardLeaderboard() {

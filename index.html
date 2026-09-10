@@ -28,7 +28,6 @@
 
       <div id="authError" style="color:var(--danger);font-size:0.85rem;margin-bottom:12px;display:none;text-align:center;font-weight:bold"></div>
 
-      <!-- Connexion -->
       <form id="loginForm" onsubmit="handleLogin(event)">
         <div class="form-group"><label>📧 Adresse Email ou Pseudo</label><input type="text" id="loginEmail" placeholder="ton@email.com" required></div>
         <div class="form-group">
@@ -37,14 +36,11 @@
           <span class="password-toggle" onclick="togglePassword('loginPass')">👁️</span>
         </div>
         <button type="submit" class="btn btn-primary" style="width:100%;margin-top:10px" id="loginBtn">Se connecter →</button>
-        
-        <!-- BOUTON D'ACCÈS ADMIN EXPRESS -->
-        <button type="button" class="btn btn-gold btn-sm" style="width:100%;margin-top:12px" onclick="quickAdminLogin()">
-          ⭐ Se connecter directement en ADMIN
-        </button>
+        <div style="text-align:center;margin-top:15px">
+          <a style="color:var(--gold);font-size:0.8rem;cursor:pointer;text-decoration:underline" onclick="forgotPassword()">Mot de passe oublié ?</a>
+        </div>
       </form>
 
-      <!-- Inscription -->
       <form id="registerForm" style="display:none" onsubmit="handleRegister(event)">
         <div class="form-group"><label>👤 Pseudo de joueur</label><input type="text" id="regUser" placeholder="Ex: Mathis_92" required minlength="3"></div>
         <div class="form-group"><label>📧 Adresse Email</label><input type="email" id="regEmail" placeholder="ton@email.com" required></div>
@@ -58,10 +54,9 @@
     </div>
   </div>
 
-  <!-- APPLICATION -->
+  <!-- APPLICATION PRINCIPALE -->
   <div id="appContainer">
     <nav class="top-nav">
-      <!-- Clic 5 fois sur le Logo pour débloquer l'Admin en cas d'urgence -->
       <div class="nav-brand" onclick="secretAdminUnlock()">Prono<span>Foot</span></div>
       
       <div class="music-widget">
@@ -113,6 +108,10 @@
           </div>
         </div>
 
+        <div id="announcementBox" style="display:none;background:var(--bg-card);border:1px solid var(--gold);padding:12px 16px;border-radius:var(--radius-sm);margin-bottom:20px;color:var(--gold)">
+          📢 <span id="announcementText"></span>
+        </div>
+
         <div class="stats-grid">
           <div class="stat-card"><div class="val" id="statPoints">0</div><div class="lbl">Mes Points</div></div>
           <div class="stat-card"><div class="val" id="statRank">#-</div><div class="lbl">Mon Rang Global</div></div>
@@ -139,11 +138,11 @@
 
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:10px">
           <h3 id="matchesSectionTitle" class="league-title-special">⚽ Calendrier 2026-27</h3>
-          <button class="btn btn-primary btn-sm" onclick="saveAll()" id="btnSavePronos">💾 Sauvegarder Mes Pronos</button>
+          <button class="btn btn-primary btn-sm" onclick="saveAll()" id="btnSavePronos">💾 Sauvegarder Pronos</button>
         </div>
 
         <div style="display:flex;gap:10px;margin-bottom:15px">
-          <button class="btn btn-sm btn-primary" id="btnTabUpcoming" onclick="switchMatchView('upcoming')" style="flex:1">🔥 À venir & Live</button>
+          <button class="btn btn-sm btn-primary" id="btnTabUpcoming" onclick="switchMatchView('upcoming')" style="flex:1">🔥 À venir & En Direct</button>
           <button class="btn btn-sm btn-secondary" id="btnTabFinished" onclick="switchMatchView('finished')" style="flex:1">📜 Matchs Terminés</button>
         </div>
 
@@ -164,7 +163,7 @@
       <!-- CLASSEMENT -->
       <div class="page-section" id="page-leaderboard">
         <h3 style="margin-bottom:5px" class="league-title-special">🏆 Classement Général Cloud</h3>
-        <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:20px">Synchronisation instantanée dès qu'un score est validé.</p>
+        <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:20px">Mise à jour automatique en direct pendant les matchs !</p>
         <div id="podiumContainer" style="margin-bottom:25px"></div>
         <div id="leaderboardContainer"></div>
       </div>
@@ -179,9 +178,9 @@
         <div id="groupsListContainer"></div>
       </div>
 
-      <!-- PROFIL (AVEC LISTE DES PRONOSTICS ET STATS) -->
+      <!-- PROFIL -->
       <div class="page-section" id="page-profile">
-        <h3 style="margin-bottom:15px" class="league-title-special">👤 Mon Profil Joueur</h3>
+        <h3 style="margin-bottom:15px" class="league-title-special">👤 Mon Profil</h3>
         <div class="admin-card" style="text-align:center;max-width:400px;margin:0 auto">
           <label style="cursor:pointer;display:block;margin:0 auto 12px;width:100px;height:100px;border-radius:50%;position:relative" title="Cliquez pour changer votre photo">
             <div class="profile-avatar-large" id="profileBigAvatar">?</div>
@@ -190,6 +189,7 @@
           </label>
           <h2 id="profileUsername">-</h2>
           <p id="profileEmail" style="color:var(--text-muted);font-size:0.85rem;margin-bottom:8px">-</p>
+          <p id="profileRole" style="color:var(--gold);font-size:0.85rem;font-weight:bold;margin-bottom:15px"></p>
 
           <div class="stats-grid" style="margin-bottom:15px">
             <div class="stat-card" style="padding:12px">
@@ -209,24 +209,28 @@
         <div id="myPredictionsList" style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:15px;max-height:400px;overflow-y:auto"></div>
       </div>
 
-      <!-- ADMIN RESTAURÉ ET SÉCURISÉ -->
+      <!-- ADMIN SÉCURISÉ ET COMPLET -->
       <div class="page-section" id="page-admin">
         <h3 class="league-title-special" style="margin-bottom:15px">⚙️ Panneau Administrateur</h3>
 
-        <!-- SYNCHRO API-SPORTS -->
+        <!-- 1. API SPORTS -->
         <div class="admin-card" style="border:2px solid var(--gold)">
-          <h4 style="color:var(--gold)">⚡ Synchronization API Sports (Résultats Réels)</h4>
-          <button class="btn btn-gold btn-sm" id="btnSyncApi" style="width:100%" onclick="saveAndSyncApiSports()">⚡ Lancer Synchro Vrais Scores (API)</button>
+          <h4 style="color:var(--gold)">⚡ Synchro API Sports (Vrais Scores)</h4>
+          <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:10px">Récupère les scores officiels des matchs terminés ou en cours :</p>
+          <div class="form-group" style="margin-bottom:10px">
+            <input type="text" id="adminApiKeyInput" placeholder="Clé API-Sports..." style="font-family:monospace">
+          </div>
+          <button class="btn btn-gold btn-sm" id="btnSyncApi" style="width:100%" onclick="saveAndSyncApiSports()">⚡ Lancer Synchro API Directe</button>
         </div>
 
-        <!-- TESTEUR LIVE -->
+        <!-- 2. TESTEUR LIVE -->
         <div class="admin-card" style="border:2px solid var(--danger)">
           <h4 style="color:var(--danger)">🔴 Mode Testeur LIVE</h4>
           <button class="btn btn-primary btn-sm" style="background:var(--danger);color:white;width:100%" onclick="adminSimulateLiveMatch()">🔴 Forcer 3 Matchs en LIVE (Test)</button>
         </div>
 
         <div class="admin-grid">
-          <!-- SAISIE ET RECHERCHE MANUELLE -->
+          <!-- 3. SAISIE MANUELLE + RECHERCHE -->
           <div class="admin-card" style="grid-column:1/-1">
             <h4>⚽ Saisie Manuelle (+500 matchs)</h4>
             <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
@@ -234,33 +238,39 @@
               <button class="btn btn-gold btn-sm" onclick="adminSimulateAll()">🎲 Simuler TOUT</button>
               <button class="btn btn-secondary btn-sm" onclick="adminResetScores()">🗑️ Réinitialiser</button>
             </div>
-            <input type="text" id="adminSearchInput" placeholder="🔍 Rechercher une équipe (ex: PSG, Barca...)" style="width:100%;padding:10px;margin-bottom:10px;background:var(--bg-body);color:white;border:1px solid var(--border);border-radius:6px" oninput="renderAdminMatchList()">
+            <input type="text" id="adminSearchInput" placeholder="🔍 Rechercher un club (ex: PSG)..." style="width:100%;padding:10px;margin-bottom:10px;background:var(--bg-body);color:white;border:1px solid var(--border);border-radius:6px;" oninput="renderAdminMatchList()">
             <div id="adminMatchList" style="max-height:350px;overflow-y:auto;border:1px solid var(--border);padding:10px;border-radius:8px"></div>
           </div>
 
-          <!-- FONDS GLOBAUX -->
+          <!-- 4. FONDS GLOBAUX -->
           <div class="admin-card" style="grid-column:1/-1">
             <h4>🖼️ Fonds d'Écran Globaux</h4>
             <div style="display:flex;gap:10px;flex-wrap:wrap">
-              <label class="btn btn-secondary btn-sm" style="cursor:pointer;flex:1">📸 Fond Connexion<input type="file" accept="image/*" style="display:none" onchange="uploadAuthBgFromFile(event)"></label>
-              <label class="btn btn-secondary btn-sm" style="cursor:pointer;flex:1">📸 Fond Accueil<input type="file" accept="image/*" style="display:none" onchange="uploadDashboardBgFromFile(event)"></label>
+              <label class="btn btn-secondary btn-sm" style="cursor:pointer;flex:1">📸 Fond Page Connexion<input type="file" accept="image/*" style="display:none" onchange="uploadAuthBgFromFile(event)"></label>
+              <label class="btn btn-secondary btn-sm" style="cursor:pointer;flex:1">📸 Fond Accueil Dashboard<input type="file" accept="image/*" style="display:none" onchange="uploadDashboardBgFromFile(event)"></label>
             </div>
           </div>
 
-          <!-- BANNIÈRES LIGUES -->
+          <!-- 5. BANNIÈRES LIGUES -->
           <div class="admin-card" style="grid-column:1/-1">
             <h4>🏟️ Bannières par Championnat</h4>
             <div id="adminLeagueBanners"></div>
           </div>
 
-          <!-- PLAYLIST MP3 -->
+          <!-- 6. FONDS LIGUES -->
+          <div class="admin-card" style="grid-column:1/-1">
+            <h4>🖼️ Arrière-plans par Championnat</h4>
+            <div id="adminLeagueBackgrounds"></div>
+          </div>
+
+          <!-- 7. PLAYLIST MP3 -->
           <div class="admin-card">
             <h4>🎵 Playlist MP3</h4>
             <label class="btn btn-secondary btn-sm" style="cursor:pointer;display:block;text-align:center">➕ Ajouter MP3<input type="file" accept="audio/*" style="display:none" onchange="adminAddMusic(event)"></label>
             <div id="adminPlaylistList" style="margin-top:10px;font-size:0.8rem;max-height:100px;overflow-y:auto"></div>
           </div>
 
-          <!-- THEME -->
+          <!-- 8. THEME -->
           <div class="admin-card">
             <h4>🎨 Couleur du Thème</h4>
             <div class="theme-colors">
@@ -271,8 +281,26 @@
               <div class="theme-dot" style="background:#0984e3" onclick="changeTheme('#0984e3')"></div>
             </div>
           </div>
+
+          <!-- 9. ANNONCE -->
+          <div class="admin-card">
+            <h4>📢 Annonce Publique</h4>
+            <div class="form-group"><input type="text" id="adminAnnounceInput" placeholder="Message général..."></div>
+            <button class="btn btn-gold btn-sm" style="width:100%" onclick="adminPublishAnnouncement()">Publier</button>
+          </div>
+
+          <!-- 10. STATS -->
+          <div class="admin-card">
+            <h4>📊 Statistiques Cloud</h4>
+            <div id="adminStats"></div>
+          </div>
         </div>
       </div>
+
+    </div>
+
+    <div class="site-footer">
+      <p>⚽ PronoFoot — Compétition Européenne 2026-27</p>
     </div>
   </div>
 
