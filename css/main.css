@@ -7,7 +7,7 @@
   --text-main: #ffffff;
   --text-muted: #8e8e93;
   --text-dim: #5a6380;
-  --accent: #00E676; /* Vert Sportif Pro */
+  --accent: #00E676;
   --accent-hover: #00C853;
   --border: #2c2c2e;
   --gold: #FFD700;
@@ -53,7 +53,6 @@ h1, h2, h3, h4 { letter-spacing: -0.02em; font-weight: 800; }
   margin-bottom: 5px;
 }
 
-/* WIDGET MUSIQUE MP3 */
 .music-widget {
   position: relative;
   display: inline-flex;
@@ -104,7 +103,6 @@ h1, h2, h3, h4 { letter-spacing: -0.02em; font-weight: 800; }
   gap: 15px;
 }
 
-/* AUTHENTIFICATION */
 .auth-overlay { position:fixed; inset:0; background:var(--bg-body); z-index:1000; display:flex; align-items:center; justify-content:center; padding:20px; }
 .auth-card { background:var(--bg-card); border:1px solid var(--border); border-radius:20px; width:100%; max-width:400px; padding:35px; box-shadow:var(--shadow); }
 .auth-header { text-align:center; margin-bottom:25px; }
@@ -118,7 +116,6 @@ h1, h2, h3, h4 { letter-spacing: -0.02em; font-weight: 800; }
 .form-group input:focus { border-color:var(--accent); }
 .password-toggle { position: absolute; right: 12px; top: 34px; cursor: pointer; filter: grayscale(1); opacity: 0.6; }
 
-/* NAVBARS */
 .top-nav { background: rgba(26, 26, 28, 0.85); border-bottom: 1px solid var(--border); padding: 0 20px; height: 65px; display: flex; align-items: center; justify-content: space-between; position: sticky; top:0; z-index: 100; backdrop-filter: blur(15px); }
 .nav-brand { font-size: 1.4rem; font-weight: 900; color: var(--text-main); cursor: pointer; text-transform: uppercase; letter-spacing: 1px; }
 .nav-brand span { color: var(--accent); }
@@ -137,7 +134,6 @@ h1, h2, h3, h4 { letter-spacing: -0.02em; font-weight: 800; }
 
 .main-content { max-width: 1000px; margin: 0 auto; padding: 20px 20px 90px; }
 
-/* BUTTONS */
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 20px; border-radius: 24px; border: none; font-weight: 800; cursor: pointer; transition: all 0.2s ease-in-out; font-size: 0.9rem; letter-spacing: -0.2px; text-transform: uppercase; box-shadow: var(--shadow); }
 .btn-primary { background: var(--accent); color: #000; }
 .btn-primary:hover { opacity: 0.95; transform: translateY(-2px); box-shadow: 0 4px 15px rgba(0, 230, 118, 0.3); }
@@ -148,7 +144,6 @@ h1, h2, h3, h4 { letter-spacing: -0.02em; font-weight: 800; }
 .btn-sm { padding: 8px 14px; font-size: 0.85rem; }
 .btn-xs { padding: 4px 8px; font-size: 0.75rem; }
 
-/* STATS */
 .welcome-banner { background: linear-gradient(135deg, #1a1a1c, #2c2c2e); padding: 25px; border-radius: var(--radius); margin-bottom: 20px; position: relative; overflow: hidden; border: 1px solid var(--border); }
 .welcome-banner::after { content: '⚽'; position: absolute; right: 15px; top: 50%; transform: translateY(-50%); font-size: 4.5rem; opacity: 0.1; }
 .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 20px; }
@@ -156,7 +151,6 @@ h1, h2, h3, h4 { letter-spacing: -0.02em; font-weight: 800; }
 .stat-card .val { font-size: 1.8rem; font-weight: 900; color: var(--text-main); }
 .stat-card .lbl { font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-top: 4px; }
 
-/* LEAGUE TABS */
 .league-tabs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 15px; }
 .league-tab { padding: 9px 16px; border-radius: 20px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-muted); cursor: pointer; white-space: nowrap; font-size: 0.85rem; font-weight: bold; transition: 0.2s; }
 .league-tab.active { background: var(--accent); color: #000; border-color: var(--accent); }
@@ -165,7 +159,6 @@ h1, h2, h3, h4 { letter-spacing: -0.02em; font-weight: 800; }
 .matchday-pill { padding: 6px 12px; border-radius: 6px; background: var(--bg-body); border: 1px solid var(--border); color: var(--text-muted); font-size: 0.8rem; font-weight: bold; cursor: pointer; white-space: nowrap; }
 .matchday-pill.active { background: var(--gold); color: #0a0a1a; border-color: var(--gold); }
 
-/* MATCH CARDS */
 .match-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; margin-bottom: 12px; transition: all 0.2s ease; }
 .match-card:hover { border-color: var(--accent); transform: translateY(-2px); }
 .match-card.finished { border-left: 5px solid var(--green); }
@@ -179,19 +172,17 @@ h1, h2, h3, h4 { letter-spacing: -0.02em; font-weight: 800; }
 .match-prediction { display: flex; justify-content: center; align-items: center; gap: 10px; }
 .match-prediction input { width: 50px; padding: 8px; text-align: center; font-size: 1.15rem; font-weight: bold; background: var(--bg-body); border: 1px solid var(--border); border-radius: 6px; color: white; outline: none; }
 .match-prediction input:focus { border-color: var(--accent); }
-.match-prediction input:disabled { opacity: 0.6; cursor: not-allowed; border-color: #333; }
+.match-prediction input:disabled { opacity: 0.5; background: #111; cursor: not-allowed; }
 .match-result-badge { text-align: center; margin-top: 10px; font-size: 0.85rem; font-weight: bold; padding: 6px; border-radius: 6px; background: rgba(0,0,0,0.4); }
 .pts-exact { color: var(--gold); }
 .pts-correct { color: var(--green); }
 .pts-wrong { color: var(--danger); }
 
-/* CHAT */
 .chat-container { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; margin-bottom: 20px; }
 .chat-box { background: var(--bg-body); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px; height: 320px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
 .chat-msg { background: var(--bg-card); border: 1px solid var(--border); padding: 10px 14px; border-radius: 10px; font-size: 0.88rem; max-width: 80%; align-self: flex-start; }
 .chat-msg.mine { align-self: flex-end; background: var(--accent); border-color: var(--accent); color: #000; font-weight: 600; }
 .chat-msg .sender { font-size: 0.75rem; font-weight: 800; color: var(--gold); margin-bottom: 3px; display: flex; justify-content: space-between; gap: 10px; }
-.chat-msg.mine .sender { color: rgba(0,0,0,0.7); }
 
 .leaderboard-table { width: 100%; border-collapse: separate; border-spacing: 0 6px; }
 .leaderboard-table th, .leaderboard-table td { padding: 14px; text-align: left; background: var(--bg-card); }

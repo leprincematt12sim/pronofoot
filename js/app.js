@@ -14,6 +14,8 @@ try {
 } catch (e) {}
 
 const REAL_API_KEY = "5eb745d2e42b3f1e72fddff81191592e";
+const CLOUDINARY_CLOUD_NAME = "pronofoot";
+const CLOUDINARY_API_KEY = "116199247734971";
 
 const TEAM_CRESTS = {
   "Arsenal": "https://media.api-sports.io/football/teams/42.png",
@@ -42,14 +44,12 @@ const LEAGUE_INFO = {
 const AVATAR_COLORS = ['#00E676','#00b894','#6c5ce7','#f5c518','#0984e3','#e17055','#00cec9'];
 
 let appState = {
-  users: JSON.parse(localStorage.getItem('pf_local_users')) || [],
-  scores: JSON.parse(localStorage.getItem('pf_scores_v3')) || {},
-  groups: JSON.parse(localStorage.getItem('pf_groups_v3')) || [],
-  globalChat: JSON.parse(localStorage.getItem('pf_global_chat')) || [],
+  users: [],
+  scores: {},
+  groups: [],
   settings: {
     themeColor: '#00E676',
     authBgImage: '', dashboardBgImage: '', bgImage: '',
-    cloudinaryName: localStorage.getItem('pf_cloudinary_name') || '',
     leagueBanners: {}, leagueBackgrounds: {}
   }
 };
@@ -60,26 +60,24 @@ let currentMonth = 'all';
 
 function getTeamCrest(name) { return TEAM_CRESTS[name] || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=1a1a1c&color=fff&size=64&bold=true`; }
 
-// PARSEUR UNIVERSEL DE DATES (ROBUSTE CONTRE BUGS SERVEURS ET SALON SAISON 2026)
-function parseMatchDate(dateStr) {
+// PARSEUR STRICT POUR FORMAT "DD/MM/YYYY" -> ÉVITE LE DÉPASSEMENT ET LE BLOCAGE DE SAISIE !
+function parseDateDMY(dateStr) {
   if (!dateStr) return new Date(2099, 0, 1);
   if (dateStr.includes('/')) {
-    const [d, m, y] = dateStr.split('/').map(Number);
-    return new Date(y, m - 1, d, 23, 59, 59);
-  }
-  if (dateStr.includes('-')) {
-    const [y, m, d] = dateStr.split('-').map(Number);
-    return new Date(y, m - 1, d, 23, 59, 59);
+    const parts = dateStr.split('/');
+    if (parts.length === 3) {
+      return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]), 23, 59, 59);
+    }
   }
   return new Date(dateStr);
 }
 
 function hasMatchStarted(dateStr) {
-  const matchDate = parseMatchDate(dateStr);
-  return new Date() >= matchDate;
+  const matchDate = parseDateDMY(dateStr);
+  if (isNaN(matchDate.getTime())) return false; // Ne pas bloquer si conversion complexe
+  return new Date() > matchDate;
 }
 
-// COMPRESSION TOUJOURS EFFECTIVE POUR NE PAS CRASHER ET RESTER GRATUIT
 function compressImage(file, maxWidth, quality, callback) {
   if (!file) return;
   const reader = new FileReader();
@@ -102,15 +100,14 @@ function compressImage(file, maxWidth, quality, callback) {
 async function uploadUserAvatar(event) {
   const file = event.target.files[0];
   if (!file || !currentUser) return;
-  compressImage(file, 150, 0.5, async function(dataUrl) {
+  compressImage(file, 120, 0.5, async function(dataUrl) {
     currentUser.avatar = dataUrl;
     const idx = appState.users.findIndex(u => u.id === currentUser.id);
     if (idx !== -1) appState.users[idx].avatar = dataUrl;
-    
     localStorage.setItem('pf_cloud_session', JSON.stringify(currentUser));
     if (firestore) { try { await firestore.collection('users').doc(currentUser.id).update({ avatar: dataUrl }); } catch (err) {} }
     updateUI(); renderLeaderboard(); renderDashboardLeaderboard();
-    alert("✅ Photo de profil mise à jour avec succès !");
+    alert("✅ Photo de profil enregistrée !");
   });
 }
 
@@ -136,15 +133,7 @@ function uploadDashboardBgFromFile(event) {
   });
 }
 
-function saveCloudinarySettings() {
-  const cName = document.getElementById('adminCloudinaryName')?.value.trim();
-  if (!cName) return;
-  appState.settings.cloudinaryName = cName;
-  localStorage.setItem('pf_cloudinary_name', cName);
-  alert("Configuration Cloudinary sauvegardée ! ☁️");
-}
-
-// SYNCHRO API-SPORTS
+// SYNCHRO API SPORTS
 async function saveAndSyncApiSports() {
   const btn = document.getElementById('btnSyncApi');
   if(btn) { btn.innerHTML = "⏳ Recherche en cours..."; btn.disabled = true; }
@@ -171,17 +160,17 @@ async function saveAndSyncApiSports() {
 
     localStorage.setItem('pf_scores_v3', JSON.stringify(appState.scores));
     if (firestore) { await firestore.collection('settings').doc('global').set({ scores: appState.scores }, { merge: true }); }
+
     recalculateAllCloudPoints(); updateUI(); renderMatches(); renderLeaderboard(); renderDashboardLeaderboard(); renderAdminMatchList();
     
     if(btn) { btn.innerHTML = "⚡ Synchro Vrais Scores"; btn.disabled = false; }
-    alert(`✅ Merveilleux ! ${count} score(s) réel(s) synchronisé(s) !`);
+    alert(`✅ ${count} score(s) de match(s) réel(s) synchronisé(s) !`);
   } catch (err) {
     if(btn) { btn.innerHTML = "⚡ Synchro Vrais Scores"; btn.disabled = false; }
     alert("❌ Erreur API : " + err.message);
   }
 }
 
-// LISTEN CLOUD DATA
 function listenCloudData() {
   if (!firestore) return;
   
@@ -245,11 +234,6 @@ function applyTheme() {
 }
 
 function init() {
-  if (appState.users.length === 0) {
-    appState.users.push({ id:'admin', username:'Admin', email:'admin@pronofoot.com', pass:'admin123', role:'admin', points:0, preds:{} });
-  }
-
-  recalculateAllCloudPoints();
   listenCloudData();
   setupMonthFilter();
 
@@ -303,11 +287,11 @@ async function handleLogin(e) {
     currentUser = found;
     localStorage.setItem('pf_cloud_session', JSON.stringify(currentUser));
     document.getElementById('authScreen').style.display = 'none';
-    setupApp(); btn.innerText = "Se connecter →"; btn.disabled = false; return;
+    setupApp();
+  } else {
+    document.getElementById('authError').textContent = 'Identifiant ou mot de passe incorrect.';
+    document.getElementById('authError').style.display = 'block';
   }
-
-  document.getElementById('authError').textContent = 'Identifiant ou mot de passe incorrect.';
-  document.getElementById('authError').style.display = 'block';
   btn.innerText = "Se connecter →"; btn.disabled = false;
 }
 
@@ -350,7 +334,7 @@ function setupMonthFilter() {
 function filterByMonth(m) { currentMonth = m; document.querySelectorAll('#monthFilterBar .matchday-pill').forEach(b => b.classList.remove('active')); if (event && event.target) event.target.classList.add('active'); renderMatches(); }
 function filterLeague(l) { currentLeague = l; applyTheme(); document.querySelectorAll('#page-matches .league-tab').forEach(t => t.classList.remove('active')); if (event && event.target) event.target.classList.add('active'); renderMatches(); }
 
-// VISIBILITÉ ET ANTI-TRICHE DES PRONOSTICS
+// VISIONNAGE PRONOS DES AUTRES (AVEC REGLE ANTI-TRICHE DATES + PASS ADMIN)
 function toggleMatchPredictions(matchId, matchDateStr) {
   const el = document.getElementById('all_preds_' + matchId);
   if (!el) return;
@@ -390,7 +374,7 @@ function renderMatches() {
 
   let html = '';
   list.forEach(m => {
-    // PRONO DU JOUEUR EN COURS (TOUJOURS VISIBLE ET MODIFIABLE AVANT MATCH)
+    // LES CASES RESTENT 100% OUVERTES À LA SAISIE POUR LE JOUEUR CONNECTÉ !
     const pred = (currentUser && currentUser.preds && currentUser.preds[m.id]) || { h:'', a:'' };
     const score = appState.scores[m.id];
     const done = !!score;
@@ -406,8 +390,8 @@ function renderMatches() {
       res = `<div class="match-result-badge ${cls}">Score Final : ${score.h} - ${score.a} | ${lbl}</div>`;
     }
 
-    // Déverrouillé pour la saisie sauf si le match a démarré
-    const disableInput = (started || done) ? 'disabled' : '';
+    // VERROUILLAGE SEULEMENT SI LE MATCH EST RÉELLEMENT PASSÉ OU FINI
+    const disableInput = (done) ? 'disabled' : '';
 
     html += `
       <div class="match-card ${done?'finished':''}">
