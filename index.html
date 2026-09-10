@@ -3,14 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>PronoFoot PRO — Saison 2026-27</title>
+  <title>PronoFoot PRO — Saison 2026-27 (Supabase Cloud)</title>
   <link rel="stylesheet" href="css/main.css">
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  
+  <!-- SDK Supabase JS Officiel -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
+  <!-- ELEMENT AUDIO CACHÉ -->
   <audio id="siteAudioPlayer"></audio>
 
   <!-- CONNEXION / INSCRIPTION -->
@@ -18,7 +19,7 @@
     <div class="auth-card">
       <div class="auth-header">
         <h1>Prono<span>Foot</span></h1>
-        <p>Saison 2026-27 — Multijoueur en Direct</p>
+        <p>Saison 2026-27 — Supabase Cloud Direct</p>
       </div>
 
       <div class="auth-tabs">
@@ -28,6 +29,7 @@
 
       <div id="authError" style="color:var(--danger);font-size:0.85rem;margin-bottom:12px;display:none;text-align:center;font-weight:bold"></div>
 
+      <!-- Formulaire Connexion -->
       <form id="loginForm" onsubmit="handleLogin(event)">
         <div class="form-group"><label>📧 Adresse Email ou Pseudo</label><input type="text" id="loginEmail" placeholder="ton@email.com" required></div>
         <div class="form-group">
@@ -41,6 +43,7 @@
         </div>
       </form>
 
+      <!-- Formulaire Inscription -->
       <form id="registerForm" style="display:none" onsubmit="handleRegister(event)">
         <div class="form-group"><label>👤 Pseudo de joueur</label><input type="text" id="regUser" placeholder="Ex: Mathis_92" required minlength="3"></div>
         <div class="form-group"><label>📧 Adresse Email</label><input type="email" id="regEmail" placeholder="ton@email.com" required></div>
@@ -70,6 +73,7 @@
             <button class="music-btn" onclick="prevSong()" title="Précédent">⏮</button>
             <button class="music-btn" onclick="toggleSiteMusic()" id="musicPlayBtn" title="Play/Pause">▶️</button>
             <button class="music-btn" onclick="nextSong()" title="Suivant">⏭</button>
+            <button class="music-btn" onclick="toggleShuffle()" id="musicShuffleBtn" title="Aléatoire" style="font-size:1rem;color:var(--text-muted)">🔀</button>
           </div>
           <div id="playlistContainer" style="max-height:100px;overflow-y:auto;display:flex;flex-direction:column;gap:2px"></div>
         </div>
@@ -87,6 +91,7 @@
       <button class="bottom-nav-item" onclick="navigateTo('matches')"><span>⚽</span><span>Matchs</span></button>
       <button class="bottom-nav-item" onclick="navigateTo('leaderboard')"><span>🏆</span><span>Général</span></button>
       <button class="bottom-nav-item" onclick="navigateTo('groups')"><span>👥</span><span>Groupes</span></button>
+      <button class="bottom-nav-item" onclick="navigateTo('chat')"><span>💬</span><span>Chat</span></button>
       <button class="bottom-nav-item" onclick="navigateTo('admin')" id="adminNavBtn" style="display:none"><span>⚙️</span><span>Admin</span></button>
     </nav>
 
@@ -108,16 +113,20 @@
           </div>
         </div>
 
+        <div id="announcementBox" style="display:none;background:var(--bg-card);border:1px solid var(--gold);padding:12px 16px;border-radius:var(--radius-sm);margin-bottom:20px;color:var(--gold)">
+          📢 <span id="announcementText"></span>
+        </div>
+
         <div class="stats-grid">
           <div class="stat-card"><div class="val" id="statPoints">0</div><div class="lbl">Mes Points</div></div>
           <div class="stat-card"><div class="val" id="statRank">#-</div><div class="lbl">Mon Rang Global</div></div>
           <div class="stat-card"><div class="val" id="statPredictions">0</div><div class="lbl">Mes Pronos</div></div>
-          <div class="stat-card"><div class="val" id="statExact">0</div><div class="lbl">Scores Exacts</div></div>
+          <div class="stat-card"><div class="val" id="statExact">0</div><div class="lbl">Scores Exacts (+5)</div></div>
         </div>
 
         <div style="margin-bottom:20px">
           <button class="btn btn-whatsapp" style="width:100%;padding:14px;font-size:1rem;margin-bottom:10px" onclick="shareChallengeWhatsApp()">
-            🔥 Défier mes amis sur WhatsApp
+            🔥 Défier mes amis sur WhatsApp (Partager mon score)
           </button>
           <button class="btn btn-primary" style="width:100%;padding:14px;font-size:1rem" onclick="navigateTo('matches')">
             ⚽ Pronostiquer les prochains matchs →
@@ -153,7 +162,7 @@
 
       <!-- CLASSEMENT -->
       <div class="page-section" id="page-leaderboard">
-        <h3 style="margin-bottom:5px" class="league-title-special">🏆 Classement Général Cloud</h3>
+        <h3 style="margin-bottom:5px" class="league-title-special">🏆 Classement Général Supabase</h3>
         <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:20px">Synchronisation instantanée dès qu'un score est validé.</p>
         <div id="podiumContainer" style="margin-bottom:25px"></div>
         <div id="leaderboardContainer"></div>
@@ -162,11 +171,25 @@
       <!-- GROUPES PRIVÉS -->
       <div class="page-section" id="page-groups">
         <h3 style="margin-bottom:5px" class="league-title-special">👥 Mes Groupes Privés</h3>
+        <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:20px">Créez votre ligue privée ou rejoignez vos amis avec leur code !</p>
+
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
           <button class="btn btn-primary" onclick="showCreateGroupPrompt()">➕ Créer un Groupe</button>
           <button class="btn btn-gold" onclick="showJoinGroupPrompt()">🔑 Rejoindre (Code)</button>
         </div>
         <div id="groupsListContainer"></div>
+      </div>
+
+      <!-- CHAT GENERAL -->
+      <div class="page-section" id="page-chat">
+        <h3 class="league-title-special" style="margin-bottom:5px">💬 Le Salon des Supporters</h3>
+        <div class="chat-container">
+          <div class="chat-box" id="globalChatMessagesBox"></div>
+          <form onsubmit="handleSendGlobalChatMessage(event)" style="display:flex;gap:8px">
+            <input type="text" id="globalChatInput" placeholder="Écris ton message..." style="flex:1;padding:12px;background:var(--bg-body);border:1px solid var(--border);border-radius:8px;color:white" required>
+            <button type="submit" class="btn btn-primary">Envoyer 🚀</button>
+          </form>
+        </div>
       </div>
 
       <!-- PROFIL -->
@@ -198,39 +221,19 @@
         </div>
       </div>
 
-      <!-- ADMIN SÉCURISÉ & CLOUDINARY CONNECTÉ -->
+      <!-- ADMIN SÉCURISÉ -->
       <div class="page-section" id="page-admin">
         <h3 class="league-title-special" style="margin-bottom:15px">⚙️ Panneau Administrateur</h3>
 
-        <!-- GESTION CLOUDINARY D'IMAGE HD -->
         <div class="admin-card" style="border:2px solid var(--accent)">
-          <h4 style="color:var(--accent)">☁️ Cloudinary (Média HD Illimité Gratuit)</h4>
-          <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:10px">Vos identifiants Cloudinary officiels pour héberger vos photos et MP3 sans limite :</p>
-          <div class="form-group" style="margin-bottom:10px">
-            <label>Cloud Name</label>
-            <input type="text" id="adminCloudName" value="pronofoot" readonly style="font-family:monospace;background:#222">
-          </div>
-          <div class="form-group" style="margin-bottom:10px">
-            <label>API Key</label>
-            <input type="text" id="adminApiKey" value="116199247734971" readonly style="font-family:monospace;background:#222">
-          </div>
-        </div>
-
-        <div class="admin-card" style="border:2px solid var(--accent)">
-          <h4 style="color:var(--accent)">🖼️ Fonds d'Écran du Site</h4>
-          
-          <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:5px">1. Fond de la page de Connexion :</p>
-          <div class="form-group" style="margin-bottom:15px">
-            <label class="btn btn-secondary" style="width:100%;cursor:pointer">
-              📸 Charger fond (Connexion)
+          <h4 style="color:var(--accent)">🖼️ Fonds d'Écran</h4>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <label class="btn btn-secondary btn-sm" style="cursor:pointer;flex:1">
+              📸 Fond Connexion
               <input type="file" accept="image/*" style="display:none" onchange="uploadAuthBgFromFile(event)">
             </label>
-          </div>
-
-          <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:5px">2. Fond de l'Accueil (Dashboard) :</p>
-          <div class="form-group">
-            <label class="btn btn-secondary" style="width:100%;cursor:pointer">
-              📸 Charger fond (Accueil)
+            <label class="btn btn-secondary btn-sm" style="cursor:pointer;flex:1">
+              📸 Fond Accueil
               <input type="file" accept="image/*" style="display:none" onchange="uploadDashboardBgFromFile(event)">
             </label>
           </div>
@@ -247,16 +250,9 @@
           <div id="adminPlaylistList" style="margin-top:10px;font-size:0.8rem;max-height:120px;overflow-y:auto;background:var(--bg-body);border-radius:6px;padding:6px"></div>
         </div>
 
-        <!-- BLOC API SPORTS CLÉ RÉELLE VISIBLE -->
         <div class="admin-card" style="border:2px solid var(--gold)">
-          <h4 style="color:var(--gold)">⚡ Synchro Vrais Scores (API Sports)</h4>
-          <div class="form-group" style="margin-bottom:10px">
-            <label>Clé API-Sports Réelle</label>
-            <input type="text" id="adminApiKeyInput" value="5eb745d2e42b3f1e72fddff81191592e" style="font-family:monospace">
-          </div>
-          <div style="display:flex;gap:8px">
-            <button class="btn btn-gold btn-sm" id="btnSyncApi" style="flex:1" onclick="saveAndSyncApiSports()">⚡ Lancer la Synchro API Réelle</button>
-          </div>
+          <h4 style="color:var(--gold)">⚡ Synchronization API Sports</h4>
+          <button class="btn btn-gold btn-sm" id="btnSyncApi" style="width:100%" onclick="saveAndSyncApiSports()">⚡ Synchro Vrais Scores</button>
         </div>
 
         <div class="admin-grid">

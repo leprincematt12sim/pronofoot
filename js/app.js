@@ -1,21 +1,19 @@
-﻿const firebaseConfig = {
-  apiKey: "AIzaSyCINnc9gGuNl5oF_0GBYq4fnO6MMlW8DFs",
-  authDomain: "pronofoot-89f3e.firebaseapp.com",
-  projectId: "pronofoot-89f3e",
-  storageBucket: "pronofoot-89f3e.firebasestorage.app",
-  messagingSenderId: "163921400915",
-  appId: "1:163921400915:web:90d3b4ffeb1cb1bd99a2a6"
-};
+﻿// ============================================
+// PRONOFOOT — SUPABASE CLIENT & MOTEUR CLOUD
+// ============================================
 
-let firestore = null;
+const SUPABASE_URL = "https://ktcsrjyuzbjnhkkglwcm.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt0Y3Nyanl1emJqbmhra2dsd2NtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkwNjA2MjIsImV4cCI6MjEwNDYzNjYyMn0.6MkmXkU-ArSogrci6YJi2QiSpT-TzR83Za9Qa0EpLHk";
+
+// Initialisation du client Supabase
+let supabase = null;
 try {
-  if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-  firestore = firebase.firestore();
-} catch (e) {}
+  if (window.supabase) {
+    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  }
+} catch (e) { console.warn("Supabase init fallback local:", e.message); }
 
 const REAL_API_KEY = "5eb745d2e42b3f1e72fddff81191592e";
-const CLOUDINARY_CLOUD_NAME = "pronofoot";
-const CLOUDINARY_API_KEY = "116199247734971";
 
 const TEAM_CRESTS = {
   "Arsenal": "https://media.api-sports.io/football/teams/42.png",
@@ -44,9 +42,10 @@ const LEAGUE_INFO = {
 const AVATAR_COLORS = ['#00E676','#00b894','#6c5ce7','#f5c518','#0984e3','#e17055','#00cec9'];
 
 let appState = {
-  users: [],
-  scores: {},
-  groups: [],
+  users: JSON.parse(localStorage.getItem('pf_local_users')) || [
+    { id:'admin', username:'Admin', email:'admin@pronofoot.com', pass:'admin123', role:'admin', points:0, preds:{} }
+  ],
+  scores: JSON.parse(localStorage.getItem('pf_scores_v3')) || {},
   settings: {
     themeColor: '#00E676',
     authBgImage: '', dashboardBgImage: '', bgImage: '',
@@ -60,24 +59,52 @@ let currentMonth = 'all';
 
 function getTeamCrest(name) { return TEAM_CRESTS[name] || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=1a1a1c&color=fff&size=64&bold=true`; }
 
-// PARSEUR STRICT POUR FORMAT "DD/MM/YYYY" -> ÉVITE LE DÉPASSEMENT ET LE BLOCAGE DE SAISIE !
 function parseDateDMY(dateStr) {
   if (!dateStr) return new Date(2099, 0, 1);
   if (dateStr.includes('/')) {
     const parts = dateStr.split('/');
-    if (parts.length === 3) {
-      return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]), 23, 59, 59);
-    }
+    if (parts.length === 3) return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]), 23, 59, 59);
   }
   return new Date(dateStr);
 }
 
 function hasMatchStarted(dateStr) {
   const matchDate = parseDateDMY(dateStr);
-  if (isNaN(matchDate.getTime())) return false; // Ne pas bloquer si conversion complexe
+  if (isNaN(matchDate.getTime())) return false;
   return new Date() > matchDate;
 }
 
+// SYNCHRO SUPABASE CLOUD (RÉCUPÉRATION DES UTILISATEURS ET SCORES)
+async function fetchSupabaseData() {
+  if (!supabase) return;
+  try {
+    // 1. Récupérer les profils utilisateurs depuis Supabase
+    const { data: profiles, error: errProf } = await supabase.from('profiles').select('*');
+    if (!errProf && profiles && profiles.length > 0) {
+      appState.users = profiles;
+      localStorage.setItem('pf_local_users', JSON.stringify(appState.users));
+    }
+
+    // 2. Récupérer les réglages et scores
+    const { data: settingsData, error: errSet } = await supabase.from('app_settings').select('*').eq('id', 'global').single();
+    if (!errSet && settingsData) {
+      appState.scores = settingsData.scores || {};
+      if (settingsData.bg_image) appState.settings.bgImage = settingsData.bg_image;
+      if (settingsData.theme_color) appState.settings.themeColor = settingsData.theme_color;
+      localStorage.setItem('pf_scores_v3', JSON.stringify(appState.scores));
+    }
+
+    recalculateAllCloudPoints();
+    updateUI();
+    renderMatches();
+    renderLeaderboard();
+    renderDashboardLeaderboard();
+  } catch(e) {
+    console.warn("Supabase fetch error:", e.message);
+  }
+}
+
+// COMPRESSION IMAGE CANVAS
 function compressImage(file, maxWidth, quality, callback) {
   if (!file) return;
   const reader = new FileReader();
@@ -104,10 +131,13 @@ async function uploadUserAvatar(event) {
     currentUser.avatar = dataUrl;
     const idx = appState.users.findIndex(u => u.id === currentUser.id);
     if (idx !== -1) appState.users[idx].avatar = dataUrl;
+    
     localStorage.setItem('pf_cloud_session', JSON.stringify(currentUser));
-    if (firestore) { try { await firestore.collection('users').doc(currentUser.id).update({ avatar: dataUrl }); } catch (err) {} }
+    if (supabase) {
+      try { await supabase.from('profiles').update({ avatar: dataUrl }).eq('id', currentUser.id); } catch (err) {}
+    }
     updateUI(); renderLeaderboard(); renderDashboardLeaderboard();
-    alert("✅ Photo de profil enregistrée !");
+    alert("✅ Photo de profil enregistrée sur Supabase !");
   });
 }
 
@@ -117,7 +147,7 @@ function uploadAuthBgFromFile(event) {
   compressImage(file, 800, 0.4, async function(dataUrl) {
     appState.settings.authBgImage = dataUrl;
     applyTheme();
-    if (firestore) { try { await firestore.collection('settings').doc('global').set({ authBgImage: dataUrl }, { merge: true }); } catch (err) {} }
+    if (supabase) { try { await supabase.from('app_settings').update({ bg_image: dataUrl }).eq('id', 'global'); } catch (err) {} }
     alert("✅ Fond de connexion mis à jour !");
   });
 }
@@ -128,7 +158,6 @@ function uploadDashboardBgFromFile(event) {
   compressImage(file, 800, 0.4, async function(dataUrl) {
     appState.settings.dashboardBgImage = dataUrl;
     applyTheme();
-    if (firestore) { try { await firestore.collection('settings').doc('global').set({ dashboardBgImage: dataUrl }, { merge: true }); } catch (err) {} }
     alert("✅ Fond d'accueil mis à jour !");
   });
 }
@@ -159,38 +188,16 @@ async function saveAndSyncApiSports() {
     });
 
     localStorage.setItem('pf_scores_v3', JSON.stringify(appState.scores));
-    if (firestore) { await firestore.collection('settings').doc('global').set({ scores: appState.scores }, { merge: true }); }
+    if (supabase) { await supabase.from('app_settings').update({ scores: appState.scores }).eq('id', 'global'); }
 
     recalculateAllCloudPoints(); updateUI(); renderMatches(); renderLeaderboard(); renderDashboardLeaderboard(); renderAdminMatchList();
     
     if(btn) { btn.innerHTML = "⚡ Synchro Vrais Scores"; btn.disabled = false; }
-    alert(`✅ ${count} score(s) de match(s) réel(s) synchronisé(s) !`);
+    alert(`✅ Merveilleux ! ${count} score(s) réel(s) synchronisé(s) !`);
   } catch (err) {
     if(btn) { btn.innerHTML = "⚡ Synchro Vrais Scores"; btn.disabled = false; }
     alert("❌ Erreur API : " + err.message);
   }
-}
-
-function listenCloudData() {
-  if (!firestore) return;
-  
-  firestore.collection('users').onSnapshot(snap => {
-    const cloudUsers = [];
-    snap.forEach(d => cloudUsers.push({ id: d.id, ...d.data() }));
-    if (cloudUsers.length > 0) appState.users = cloudUsers;
-    if (currentUser) { const u = appState.users.find(x => x.id === currentUser.id); if (u) currentUser = u; }
-    recalculateAllCloudPoints(); updateUI(); renderMatches(); renderLeaderboard(); renderDashboardLeaderboard();
-  });
-
-  firestore.collection('settings').doc('global').onSnapshot(doc => {
-    if (doc.exists) {
-      const data = doc.data();
-      appState.scores = data.scores || {};
-      appState.settings = { ...appState.settings, ...data };
-      applyTheme(); recalculateAllCloudPoints(); updateUI(); renderMatches(); renderLeaderboard(); renderDashboardLeaderboard();
-      if (currentUser && currentUser.role === 'admin') renderAdminMatchList();
-    }
-  });
 }
 
 function calcPts(pred, score) {
@@ -234,7 +241,7 @@ function applyTheme() {
 }
 
 function init() {
-  listenCloudData();
+  fetchSupabaseData();
   setupMonthFilter();
 
   if (currentUser) { document.getElementById('authScreen').style.display = 'none'; setupApp(); } 
@@ -267,6 +274,7 @@ function switchAuth(tab) {
   }
 }
 
+// AUTHENTIFICATION COMBINÉE (SUPABASE + FALLBACK)
 async function handleLogin(e) {
   e.preventDefault();
   const userOrEmail = document.getElementById('loginEmail').value.trim().toLowerCase();
@@ -274,24 +282,17 @@ async function handleLogin(e) {
   const btn = document.getElementById('loginBtn');
   btn.innerText = "⏳ Connexion..."; btn.disabled = true;
 
-  if (firestore && appState.users.length <= 1) {
-    try {
-      const snap = await firestore.collection('users').get();
-      if (!snap.empty) appState.users = snap.docs.map(d => ({id: d.id, ...d.data()}));
-    } catch(err) {}
-  }
-
   const found = appState.users.find(u => (u.email.toLowerCase() === userOrEmail || u.username.toLowerCase() === userOrEmail) && u.pass === pass);
 
   if (found) {
     currentUser = found;
     localStorage.setItem('pf_cloud_session', JSON.stringify(currentUser));
     document.getElementById('authScreen').style.display = 'none';
-    setupApp();
-  } else {
-    document.getElementById('authError').textContent = 'Identifiant ou mot de passe incorrect.';
-    document.getElementById('authError').style.display = 'block';
+    setupApp(); btn.innerText = "Se connecter →"; btn.disabled = false; return;
   }
+
+  document.getElementById('authError').textContent = 'Identifiant ou mot de passe incorrect.';
+  document.getElementById('authError').style.display = 'block';
   btn.innerText = "Se connecter →"; btn.disabled = false;
 }
 
@@ -309,11 +310,17 @@ async function handleRegister(e) {
     btn.innerText = "Créer mon compte →"; btn.disabled = false; return;
   }
 
-  const newUser = { id: 'u_' + Date.now(), username, email, pass, role: 'user', points: 0, preds: {}, createdAt: new Date().toISOString() };
-  if (firestore) { try { const ref = await firestore.collection('users').add(newUser); newUser.id = ref.id; } catch (e) {} }
+  const newUser = { id: 'u_' + Date.now(), username, email, pass, role: 'user', points: 0, preds: {}, created_at: new Date().toISOString() };
+  
+  if (supabase) {
+    try { await supabase.from('profiles').insert([newUser]); } catch(err) {}
+  }
+
   appState.users.push(newUser);
+  localStorage.setItem('pf_local_users', JSON.stringify(appState.users));
   currentUser = newUser;
   localStorage.setItem('pf_cloud_session', JSON.stringify(currentUser));
+  
   document.getElementById('authScreen').style.display = 'none';
   setupApp(); btn.innerText = "Créer mon compte →"; btn.disabled = false;
 }
@@ -334,7 +341,6 @@ function setupMonthFilter() {
 function filterByMonth(m) { currentMonth = m; document.querySelectorAll('#monthFilterBar .matchday-pill').forEach(b => b.classList.remove('active')); if (event && event.target) event.target.classList.add('active'); renderMatches(); }
 function filterLeague(l) { currentLeague = l; applyTheme(); document.querySelectorAll('#page-matches .league-tab').forEach(t => t.classList.remove('active')); if (event && event.target) event.target.classList.add('active'); renderMatches(); }
 
-// VISIONNAGE PRONOS DES AUTRES (AVEC REGLE ANTI-TRICHE DATES + PASS ADMIN)
 function toggleMatchPredictions(matchId, matchDateStr) {
   const el = document.getElementById('all_preds_' + matchId);
   if (!el) return;
@@ -374,7 +380,6 @@ function renderMatches() {
 
   let html = '';
   list.forEach(m => {
-    // LES CASES RESTENT 100% OUVERTES À LA SAISIE POUR LE JOUEUR CONNECTÉ !
     const pred = (currentUser && currentUser.preds && currentUser.preds[m.id]) || { h:'', a:'' };
     const score = appState.scores[m.id];
     const done = !!score;
@@ -390,7 +395,6 @@ function renderMatches() {
       res = `<div class="match-result-badge ${cls}">Score Final : ${score.h} - ${score.a} | ${lbl}</div>`;
     }
 
-    // VERROUILLAGE SEULEMENT SI LE MATCH EST RÉELLEMENT PASSÉ OU FINI
     const disableInput = (done) ? 'disabled' : '';
 
     html += `
@@ -429,10 +433,12 @@ async function saveAll() {
     }
   });
 
-  if (firestore) { try { await firestore.collection('users').doc(currentUser.id).update({ preds: currentUser.preds }); } catch (err) {} }
+  if (supabase) {
+    try { await supabase.from('profiles').update({ preds: currentUser.preds }).eq('id', currentUser.id); } catch (err) {}
+  }
   localStorage.setItem('pf_cloud_session', JSON.stringify(currentUser));
   recalculateAllCloudPoints(); updateUI(); renderMatches(); renderLeaderboard(); renderDashboardLeaderboard();
-  alert(`${count} pronostics enregistrés dans le Cloud ! ☁️✅`);
+  alert(`${count} pronostics enregistrés dans Supabase ! ☁️✅`);
 }
 
 function updateUI() {
@@ -503,7 +509,7 @@ async function adminSaveScore(id) {
   const a = parseInt(document.getElementById('aa_' + id)?.value);
   if (isNaN(h) || isNaN(a)) { alert('Entrez les 2 scores !'); return; }
   appState.scores[id] = { h, a };
-  if (firestore) { try { await firestore.collection('settings').doc('global').set({ scores: appState.scores }, { merge: true }); } catch (e) {} }
+  if (supabase) { try { await supabase.from('app_settings').update({ scores: appState.scores }).eq('id', 'global'); } catch (e) {} }
   recalculateAllCloudPoints(); updateUI(); renderMatches(); renderLeaderboard(); renderDashboardLeaderboard();
   alert('Score enregistré !');
 }
