@@ -276,100 +276,8 @@ function setupMonthFilter() {
   bar.innerHTML = html;
 }
 
-// SYNCHRO API SPORTS
-async function fetchLiveScoresFromAPI() {
-  const apiKey = REAL_API_KEY;
-  try {
-    const todayStr = new Date().toISOString().split('T')[0];
-    const res = await fetch(`https://v3.football.api-sports.io/fixtures?date=${todayStr}`, {
-      method: "GET",
-      headers: { "x-apisports-key": apiKey }
-    });
-
-    const data = await res.json();
-    const fixtures = data.response || [];
-    let updated = 0;
-
-    fixtures.forEach(f => {
-      if (['FT', 'AET', 'PEN'].includes(f.fixture.status.short)) {
-        const homeName = f.teams.home.name.toLowerCase();
-        const awayName = f.teams.away.name.toLowerCase();
-
-        const match = ALL_MATCHES.find(m => 
-          m.home.toLowerCase().includes(homeName) || m.away.toLowerCase().includes(awayName)
-        );
-
-        if (match && !appState.scores[match.id]) {
-          appState.scores[match.id] = { h: f.goals.home, a: f.goals.away };
-          updated++;
-        }
-      }
-    });
-
-    if (updated > 0) {
-      localStorage.setItem('pf_scores_v3', JSON.stringify(appState.scores));
-      if (firestore) {
-        await firestore.collection('settings').doc('global').set({ scores: appState.scores }, { merge: true });
-      }
-      recalculateAllCloudPoints();
-      updateUI();
-      renderMatches();
-      renderLeaderboard();
-      renderDashboardLeaderboard();
-    }
-  } catch (e) {}
-}
-
-async function saveAndSyncApiSports() {
-  const apiKey = document.getElementById('adminApiKeyInput').value.trim() || REAL_API_KEY;
-  const statusEl = document.getElementById('apiSyncStatus');
-  statusEl.textContent = "⏳ Synchro en cours avec API-Sports...";
-
-  try {
-    const todayStr = new Date().toISOString().split('T')[0];
-    const res = await fetch(`https://v3.football.api-sports.io/fixtures?date=${todayStr}`, {
-      method: "GET",
-      headers: { "x-apisports-key": apiKey }
-    });
-
-    const data = await res.json();
-    const fixtures = data.response || [];
-    let count = 0;
-
-    fixtures.forEach(f => {
-      if (['FT', 'AET', 'PEN'].includes(f.fixture.status.short)) {
-        const hName = f.teams.home.name.toLowerCase();
-        const aName = f.teams.away.name.toLowerCase();
-
-        const match = ALL_MATCHES.find(m => 
-          m.home.toLowerCase().includes(hName) || m.away.toLowerCase().includes(aName)
-        );
-
-        if (match) {
-          appState.scores[match.id] = { h: f.goals.home, a: f.goals.away };
-          count++;
-        }
-      }
-    });
-
-    localStorage.setItem('pf_scores_v3', JSON.stringify(appState.scores));
-    if (firestore) {
-      await firestore.collection('settings').doc('global').set({ scores: appState.scores }, { merge: true });
-    }
-
-    recalculateAllCloudPoints();
-    updateUI();
-    renderMatches();
-    renderLeaderboard();
-    renderDashboardLeaderboard();
-    renderAdminMatchList();
-
-    statusEl.textContent = `✅ Synchro réussie ! ${count} score(s) mis à jour.`;
-    alert(`⚡ Synchro API-Sports terminée ! ${count} match(s) actualisé(s).`);
-  } catch (err) {
-    statusEl.textContent = "❌ Erreur API : " + err.message;
-    alert("Erreur API-Sports : " + err.message);
-  }
+function getTeamCrest(name) {
+  return TEAM_CRESTS[name] || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=16213e&color=fff&size=64&bold=true`;
 }
 
 function compressAndReadFile(file, maxWidth, quality, callback) {
@@ -392,6 +300,7 @@ function compressAndReadFile(file, maxWidth, quality, callback) {
       const dataUrl = canvas.toDataURL('image/jpeg', quality);
       callback(dataUrl);
     };
+    img.onerror = function() { alert("Erreur lors de la lecture du fichier image."); };
     img.src = e.target.result;
   };
   reader.readAsDataURL(file);
@@ -469,7 +378,6 @@ function listenCloudData() {
         const data = doc.data();
         appState.scores = data.scores || {};
         appState.settings = { ...appState.settings, ...data };
-        setupAudioPlayer();
         applyTheme();
         if (appState.settings.announce) {
           document.getElementById('announcementBox').style.display = 'block';
@@ -573,6 +481,7 @@ function setupApp() {
   renderGroups();
   renderGlobalChat();
   
+  // N'afficher l'Admin QUE si currentUser a role === 'admin'
   if (currentUser && currentUser.role === 'admin') {
     document.getElementById('adminNavBtn').style.display = 'flex';
     document.getElementById('topAdminBtn').style.display = 'block';
@@ -1299,6 +1208,94 @@ function renderAdminStats() {
     <div style="display:flex;justify-content:space-between;padding:6px 0"><span>Pronostics totaux</span><strong style="color:var(--gold)">${p}</strong></div>`;
 }
 
+function renderAdminLeagueBackgrounds() {
+  const container = document.getElementById('adminLeagueBackgrounds');
+  if (!container) return;
+  let html = '';
+  for (const [key, li] of Object.entries(LEAGUE_INFO)) {
+    const url = (appState.settings.leagueBackgrounds && appState.settings.leagueBackgrounds[key]) || li.defaultBg;
+    html += `
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);flex-wrap:wrap">
+        <span style="min-width:140px;font-weight:600">${li.flag} ${li.name}</span>
+        <label style="background:var(--accent);color:#000;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:bold">
+          📁 Fond PC
+          <input type="file" accept="image/*" style="display:none" onchange="uploadLeagueBgFromFile(event, '${key}')">
+        </label>
+        <img src="${url}" style="width:70px;height:40px;object-fit:cover;border-radius:4px;border:1px solid var(--border)">
+      </div>`;
+  }
+  container.innerHTML = html;
+}
+
+function renderAdminLeagueBanners() {
+  const container = document.getElementById('adminLeagueBanners');
+  if (!container) return;
+  let html = '';
+  for (const [key, li] of Object.entries(LEAGUE_INFO)) {
+    const url = (appState.settings.leagueBanners && appState.settings.leagueBanners[key]) || li.defaultBanner;
+    html += `
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);flex-wrap:wrap">
+        <span style="min-width:140px;font-weight:600">${li.flag} ${li.name}</span>
+        <label style="background:var(--accent);color:#000;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:bold">
+          📁 Bannière PC
+          <input type="file" accept="image/*" style="display:none" onchange="uploadBannerFromFile(event, '${key}')">
+        </label>
+        <img src="${url}" style="width:70px;height:40px;object-fit:cover;border-radius:4px;border:1px solid var(--border)">
+      </div>`;
+  }
+  container.innerHTML = html;
+}
+
+function uploadLeagueBgFromFile(event, leagueKey) {
+  const file = event.target.files[0];
+  if (!file) return;
+  compressAndReadFile(file, 1200, 0.6, async function(dataUrl) {
+    if (!appState.settings.leagueBackgrounds) appState.settings.leagueBackgrounds = {};
+    appState.settings.leagueBackgrounds[leagueKey] = dataUrl;
+    try { localStorage.setItem('pf_backgrounds_v2', JSON.stringify(appState.settings.leagueBackgrounds)); } catch(e){}
+    applyTheme();
+    renderAdminLeagueBackgrounds();
+    if (firestore) {
+      try { await firestore.collection('settings').doc('global').set({ leagueBackgrounds: appState.settings.leagueBackgrounds }, { merge: true }); } catch (e) {}
+    }
+    alert(`Arrière-plan mis à jour pour ${LEAGUE_INFO[leagueKey].name} ! 🏟️`);
+  });
+}
+
+function uploadBannerFromFile(event, leagueKey) {
+  const file = event.target.files[0];
+  if (!file) return;
+  compressAndReadFile(file, 1000, 0.6, async function(dataUrl) {
+    if (!appState.settings.leagueBanners) appState.settings.leagueBanners = {};
+    appState.settings.leagueBanners[leagueKey] = dataUrl;
+    try { localStorage.setItem('pf_banners_v2', JSON.stringify(appState.settings.leagueBanners)); } catch(e){}
+    renderMatches();
+    renderAdminLeagueBanners();
+    if (firestore) {
+      try { await firestore.collection('settings').doc('global').set({ leagueBanners: appState.settings.leagueBanners }, { merge: true }); } catch (e) {}
+    }
+    alert(`Bannière mise à jour pour ${LEAGUE_INFO[leagueKey].name} ! ⚽`);
+  });
+}
+
+async function adminPublishAnnouncement() {
+  const t = document.getElementById('adminAnnounceInput').value.trim();
+  if (!t) return;
+  appState.settings.announce = t;
+  if (firestore) {
+    try { await firestore.collection('settings').doc('global').set({ announce: t }, { merge: true }); } catch (e) {}
+  }
+  alert('Annonce publiée ! 📢');
+}
+
+async function changeTheme(c) {
+  appState.settings.themeColor = c;
+  if (firestore) {
+    try { await firestore.collection('settings').doc('global').set({ themeColor: c }, { merge: true }); } catch (e) {}
+  }
+  applyTheme();
+}
+
 function filterLeague(l) {
   currentLeague = l;
   applyTheme();
@@ -1317,7 +1314,6 @@ function filterByMonth(m) {
   renderMatches();
 }
 
-// NAVIGATION AVEC BLOCAGE STRICT DE L'ADMIN POUR LES UTILISATEURS NORMAUX
 function navigateTo(p) {
   if (p === 'admin') {
     if (!currentUser || currentUser.role !== 'admin') {
@@ -1337,7 +1333,7 @@ function navigateTo(p) {
   if (page) page.classList.add('active');
   const btn = document.querySelector(`[onclick="navigateTo('${p}')"]`);
   if (btn) btn.classList.add('active');
-  if (p === 'admin') { renderAdminMatchList(); renderAdminStats(); renderAdminLeagueBanners(); renderAdminLeagueBackgrounds(); }
+  if (p === 'admin') { renderAdminMatchList(); renderAdminStats(); renderAdminLeagueBanners(); renderAdminLeagueBackgrounds(); renderAdminPlaylist(); }
   if (p === 'leaderboard') renderLeaderboard();
   if (p === 'groups') renderGroups();
   if (p === 'chat') renderGlobalChat();
