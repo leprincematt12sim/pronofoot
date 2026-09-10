@@ -1,21 +1,18 @@
-﻿// ============================================
-// PRONOFOOT — ARCHITECTURE OFFICIELLE DISTRIBUÉE
-// 🗄️ Base de données : SUPABASE
-// 🖼️ Médias (Fichiers, MP3, Photos HD) : CLOUDINARY
-// ⚽ Scores réels : API-SPORTS
-// ============================================
+﻿const firebaseConfig = {
+  apiKey: "AIzaSyCINnc9gGuNl5oF_0GBYq4fnO6MMlW8DFs",
+  authDomain: "pronofoot-89f3e.firebaseapp.com",
+  projectId: "pronofoot-89f3e",
+  storageBucket: "pronofoot-89f3e.firebasestorage.app",
+  messagingSenderId: "163921400915",
+  appId: "1:163921400915:web:90d3b4ffeb1cb1bd99a2a6"
+};
 
-// --- 🗄️ IDENTIFIANTS SUPABASE ---
-const SUPABASE_URL = "https://ktcsrjyuzbjnhkkglwcm.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt0Y3Nyanl1emJqbmhra2dsd2NtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkwNjA2MjIsImV4cCI6MjEwNDYzNjYyMn0.6MkmXkU-ArSogrci6YJi2QiSpT-TzR83Za9Qa0EpLHk";
-let supabase = null;
-try { if (window.supabase) supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); } catch(e){}
+let firestore = null;
+try {
+  if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+  firestore = firebase.firestore();
+} catch (e) {}
 
-// --- 🖼️ IDENTIFIANTS CLOUDINARY ---
-const CLOUDINARY_URL = "https://api.cloudinary.com/v1_1/pronofoot/auto/upload";
-const CLOUDINARY_UPLOAD_PRESET = "pronofoot_upload";
-
-// --- ⚽ IDENTIFIANTS API-SPORTS ---
 const REAL_API_KEY = "5eb745d2e42b3f1e72fddff81191592e";
 
 const TEAM_CRESTS = {
@@ -25,91 +22,133 @@ const TEAM_CRESTS = {
   "Manchester United": "https://media.api-sports.io/football/teams/33.png",
   "Chelsea": "https://media.api-sports.io/football/teams/49.png",
   "Tottenham": "https://media.api-sports.io/football/teams/47.png",
+  "Newcastle": "https://media.api-sports.io/football/teams/34.png",
   "Real Madrid": "https://media.api-sports.io/football/teams/541.png",
   "FC Barcelone": "https://media.api-sports.io/football/teams/529.png",
+  "Atlético Madrid": "https://media.api-sports.io/football/teams/530.png",
   "Paris Saint-Germain": "https://media.api-sports.io/football/teams/85.png",
   "Olympique de Marseille": "https://media.api-sports.io/football/teams/81.png",
   "Bayern Munich": "https://media.api-sports.io/football/teams/157.png",
-  "Borussia Dortmund": "https://media.api-sports.io/football/teams/165.png"
+  "Borussia Dortmund": "https://media.api-sports.io/football/teams/165.png",
+  "Inter Milan": "https://media.api-sports.io/football/teams/505.png",
+  "AC Milan": "https://media.api-sports.io/football/teams/489.png",
+  "Juventus": "https://media.api-sports.io/football/teams/496.png",
+  "Naples": "https://media.api-sports.io/football/teams/492.png",
+  "AS Rome": "https://media.api-sports.io/football/teams/497.png"
 };
 
 const LEAGUE_INFO = {
-  champions:{ name:'Ligue des Champions', flag:'🏆', accent:'#f5c518', defaultBg:'https://images.unsplash.com/photo-1518091043644-c1d4457512c6?auto=format&fit=crop&w=1920&q=80' },
-  premier:{ name:'Premier League', flag:'🏴󠁧󠁢󠁥󠁮󠁧󠁿', accent:'#3d195b', defaultBg:'https://images.unsplash.com/photo-1522778119026-d647f0596c20?auto=format&fit=crop&w=1920&q=80' },
-  laliga:{ name:'La Liga', flag:'🇪🇸', accent:'#ee8707', defaultBg:'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1920&q=80' },
-  seriea:{ name:'Serie A', flag:'🇮🇹', accent:'#024494', defaultBg:'https://images.unsplash.com/photo-1510566337590-2fc1f21d0faa?auto=format&fit=crop&w=1920&q=80' },
-  bundesliga:{ name:'Bundesliga', flag:'🇩🇪', accent:'#d20515', defaultBg:'https://images.unsplash.com/photo-1489944445391-11dd35572130?auto=format&fit=crop&w=1920&q=80' },
-  ligue1:{ name:'Ligue 1', flag:'🇫🇷', accent:'#091c3e', defaultBg:'https://images.unsplash.com/photo-1517466787929-bc90951d0974?auto=format&fit=crop&w=1920&q=80' }
+  champions:{ name:'Ligue des Champions', flag:'🏆', accent:'#f5c518', defaultBanner:'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=1200&q=80', defaultBg:'https://images.unsplash.com/photo-1518091043644-c1d4457512c6?auto=format&fit=crop&w=1920&q=80' },
+  premier:{ name:'Premier League', flag:'🏴󠁧󠁢󠁥󠁮󠁧󠁿', accent:'#3d195b', defaultBanner:'https://images.unsplash.com/photo-1522778119026-d647f0596c20?auto=format&fit=crop&w=1200&q=80', defaultBg:'https://images.unsplash.com/photo-1522778119026-d647f0596c20?auto=format&fit=crop&w=1920&q=80' },
+  laliga:{ name:'La Liga', flag:'🇪🇸', accent:'#ee8707', defaultBanner:'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1200&q=80', defaultBg:'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1920&q=80' },
+  seriea:{ name:'Serie A', flag:'🇮🇹', accent:'#024494', defaultBanner:'https://images.unsplash.com/photo-1510566337590-2fc1f21d0faa?auto=format&fit=crop&w=1200&q=80', defaultBg:'https://images.unsplash.com/photo-1510566337590-2fc1f21d0faa?auto=format&fit=crop&w=1920&q=80' },
+  bundesliga:{ name:'Bundesliga', flag:'🇩🇪', accent:'#d20515', defaultBanner:'https://images.unsplash.com/photo-1489944445391-11dd35572130?auto=format&fit=crop&w=1200&q=80', defaultBg:'https://images.unsplash.com/photo-1489944445391-11dd35572130?auto=format&fit=crop&w=1920&q=80' },
+  ligue1:{ name:'Ligue 1', flag:'🇫🇷', accent:'#091c3e', defaultBanner:'https://images.unsplash.com/photo-1517466787929-bc90951d0974?auto=format&fit=crop&w=1200&q=80', defaultBg:'https://images.unsplash.com/photo-1517466787929-bc90951d0974?auto=format&fit=crop&w=1920&q=80' }
 };
+
+const AVATAR_COLORS = ['#00E676','#00b894','#6c5ce7','#f5c518','#0984e3','#e17055','#00cec9'];
 
 let appState = {
-  users: JSON.parse(localStorage.getItem('pf_users')) || [],
-  scores: JSON.parse(localStorage.getItem('pf_scores')) || {},
-  settings: { themeColor: '#00E676', bgImage: '', playlist: [] }
+  users: JSON.parse(localStorage.getItem('pf_local_users')) || [],
+  scores: JSON.parse(localStorage.getItem('pf_scores_v3')) || {},
+  groups: JSON.parse(localStorage.getItem('pf_groups_v3')) || [],
+  settings: {
+    themeColor: '#00E676', authBgImage: '', dashboardBgImage: '', bgImage: '',
+    leagueBanners: {}, leagueBackgrounds: {}
+  }
 };
 
-let currentUser = JSON.parse(localStorage.getItem('pf_session')) || null;
+let currentUser = JSON.parse(localStorage.getItem('pf_cloud_session')) || null;
 let currentLeague = 'all';
 let currentMonth = 'all';
 
 function getTeamCrest(name) { return TEAM_CRESTS[name] || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=1a1a1c&color=fff&size=64&bold=true`; }
 
-// ==========================================
-// 🖼️ CLOUDINARY API : Envoi de Fichiers Lourds (Gratuit et Rapide)
-// ==========================================
-async function uploadToCloudinary(event, type) {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  const formData = new FormData();
-  formData.append('file', file);
-  formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
-
-  alert("⏳ Upload en cours vers le serveur Cloudinary...");
-
-  try {
-    const res = await fetch(CLOUDINARY_URL, { method: 'POST', body: formData });
-    const data = await res.json();
-    
-    if (data.secure_url) {
-      const url = data.secure_url;
-      
-      if (type === 'avatar' && currentUser) {
-        currentUser.avatar = url;
-        const idx = appState.users.findIndex(u => u.id === currentUser.id);
-        if (idx !== -1) appState.users[idx].avatar = url;
-        localStorage.setItem('pf_session', JSON.stringify(currentUser));
-        if (supabase) { await supabase.from('profiles').update({ avatar: url }).eq('id', currentUser.id); }
-        alert("✅ Photo de profil mise à jour !");
-        updateUI(); renderLeaderboard();
-      }
-      else if (type === 'music') {
-        const newSong = { name: file.name.replace('.mp3', ''), src: url };
-        if (!appState.settings.playlist) appState.settings.playlist = [];
-        appState.settings.playlist.push(newSong);
-        if (supabase) { await supabase.from('app_settings').update({ playlist: appState.settings.playlist }).eq('id', 'global'); }
-        setupAudioPlayer(); renderAdminPlaylist();
-        alert(`🎵 Musique ajoutée avec succès !`);
-      }
-    } else {
-      alert("❌ Erreur Cloudinary (Vérifiez le nom de l'Upload Preset).");
-    }
-  } catch (err) {
-    alert("❌ Échec de la connexion à Cloudinary : " + err.message);
+function parseDateDMY(dateStr) {
+  if (!dateStr) return new Date(2099, 0, 1);
+  if (dateStr.includes('/')) {
+    const parts = dateStr.split('/');
+    if (parts.length === 3) return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]), 23, 59, 59);
   }
+  if (dateStr.includes('-')) {
+    const parts = dateStr.split('-');
+    return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]), 23, 59, 59);
+  }
+  return new Date(dateStr);
 }
 
-// ==========================================
-// ⚽ API-SPORTS : Synchro des Vrais Scores
-// ==========================================
+function hasMatchStarted(dateStr) {
+  const matchDate = parseDateDMY(dateStr);
+  if (isNaN(matchDate.getTime())) return false;
+  return new Date() > matchDate;
+}
+
+function compressImage(file, maxWidth, quality, callback) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const img = new Image();
+    img.onload = function() {
+      const canvas = document.createElement('canvas');
+      let width = img.width, height = img.height;
+      if (width > maxWidth) { height = Math.round((height * maxWidth) / width); width = maxWidth; }
+      canvas.width = width; canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+      callback(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function uploadUserAvatar(event) {
+  const file = event.target.files[0];
+  if (!file || !currentUser) return;
+  compressImage(file, 150, 0.5, async function(dataUrl) {
+    currentUser.avatar = dataUrl;
+    const idx = appState.users.findIndex(u => u.id === currentUser.id);
+    if (idx !== -1) appState.users[idx].avatar = dataUrl;
+    
+    localStorage.setItem('pf_cloud_session', JSON.stringify(currentUser));
+    if (firestore) { try { await firestore.collection('users').doc(currentUser.id).update({ avatar: dataUrl }); } catch (err) {} }
+    updateUI(); renderLeaderboard(); renderDashboardLeaderboard();
+    alert("✅ Photo de profil enregistrée !");
+  });
+}
+
+function uploadAuthBgFromFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  compressImage(file, 800, 0.4, async function(dataUrl) {
+    appState.settings.authBgImage = dataUrl;
+    applyTheme();
+    if (firestore) { try { await firestore.collection('settings').doc('global').set({ authBgImage: dataUrl }, { merge: true }); } catch (err) {} }
+    alert("✅ Fond de connexion mis à jour !");
+  });
+}
+
+function uploadDashboardBgFromFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  compressImage(file, 800, 0.4, async function(dataUrl) {
+    appState.settings.dashboardBgImage = dataUrl;
+    applyTheme();
+    if (firestore) { try { await firestore.collection('settings').doc('global').set({ dashboardBgImage: dataUrl }, { merge: true }); } catch (err) {} }
+    alert("✅ Fond d'accueil mis à jour !");
+  });
+}
+
+// SYNCHRO API SPORTS
 async function saveAndSyncApiSports() {
   const btn = document.getElementById('btnSyncApi');
-  if(btn) { btn.innerHTML = "⏳ Recherche des scores réels..."; btn.disabled = true; }
+  if(btn) { btn.innerHTML = "⏳ Recherche des scores réels en cours..."; btn.disabled = true; }
 
   try {
     const todayStr = new Date().toISOString().split('T')[0];
     const res = await fetch(`https://v3.football.api-sports.io/fixtures?date=${todayStr}`, {
-      method: "GET", headers: { "x-apisports-key": REAL_API_KEY }
+      method: "GET",
+      headers: { "x-apisports-key": REAL_API_KEY }
     });
 
     const data = await res.json();
@@ -125,51 +164,40 @@ async function saveAndSyncApiSports() {
       }
     });
 
-    localStorage.setItem('pf_scores', JSON.stringify(appState.scores));
-    if (supabase) { await supabase.from('app_settings').update({ scores: appState.scores }).eq('id', 'global'); }
+    localStorage.setItem('pf_scores_v3', JSON.stringify(appState.scores));
+    if (firestore) { await firestore.collection('settings').doc('global').set({ scores: appState.scores }, { merge: true }); }
 
-    recalcAllPoints(); updateUI(); renderMatches(); renderLeaderboard(); renderDashboardLeaderboard(); renderAdminMatchList();
+    recalculateAllCloudPoints(); updateUI(); renderMatches(); renderLeaderboard(); renderDashboardLeaderboard(); renderAdminMatchList();
+    
     if(btn) { btn.innerHTML = "⚡ Synchro Vrais Scores"; btn.disabled = false; }
-    alert(`✅ Merveilleux ! ${count} score(s) réel(s) synchronisé(s) avec succès !`);
+    alert(`✅ Merveilleux ! ${count} score(s) réel(s) synchronisé(s) depuis l'API !`);
   } catch (err) {
     if(btn) { btn.innerHTML = "⚡ Synchro Vrais Scores"; btn.disabled = false; }
-    alert("❌ Erreur de connexion avec l'API Sports : " + err.message);
+    alert("❌ Erreur API : " + err.message);
   }
 }
 
-// ==========================================
-// 🗄️ SUPABASE : Base de Données SQL
-// ==========================================
-async function fetchSupabaseData() {
-  if (!supabase) return;
-  try {
-    const { data: profiles, error: errProf } = await supabase.from('profiles').select('*');
-    if (!errProf && profiles) { appState.users = profiles; localStorage.setItem('pf_users', JSON.stringify(appState.users)); }
-    
-    const { data: settingsData, error: errSet } = await supabase.from('app_settings').select('*').eq('id', 'global').single();
-    if (!errSet && settingsData) {
-      appState.scores = settingsData.scores || {};
-      if (settingsData.bg_image) appState.settings.bgImage = settingsData.bg_image;
-      if (settingsData.playlist) appState.settings.playlist = settingsData.playlist;
-      localStorage.setItem('pf_scores', JSON.stringify(appState.scores));
+// FIREBASE CLOUD LISTENERS
+function listenCloudData() {
+  if (!firestore) return;
+  
+  firestore.collection('users').onSnapshot(snap => {
+    const cloudUsers = [];
+    snap.forEach(d => cloudUsers.push({ id: d.id, ...d.data() }));
+    if (cloudUsers.length > 0) appState.users = cloudUsers;
+    if (currentUser) { const u = appState.users.find(x => x.id === currentUser.id); if (u) currentUser = u; }
+    recalculateAllCloudPoints(); updateUI(); renderMatches(); renderLeaderboard(); renderDashboardLeaderboard();
+  });
+
+  firestore.collection('settings').doc('global').onSnapshot(doc => {
+    if (doc.exists) {
+      const data = doc.data();
+      appState.scores = data.scores || {};
+      appState.settings = { ...appState.settings, ...data };
+      applyTheme(); recalculateAllCloudPoints(); updateUI(); renderMatches(); renderLeaderboard(); renderDashboardLeaderboard();
+      if (currentUser && currentUser.role === 'admin') renderAdminMatchList();
     }
-    
-    recalcAllPoints(); updateUI(); renderMatches(); renderLeaderboard(); renderDashboardLeaderboard();
-  } catch(e) {}
-}
-
-function parseMatchDate(dateStr) {
-  if (!dateStr) return new Date(2099, 0, 1);
-  if (dateStr.includes('/')) {
-    const parts = dateStr.split('/');
-    if (parts.length === 3) return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]), 23, 59, 59);
-  }
-  return new Date(dateStr);
-}
-function hasMatchStarted(dateStr) {
-  const matchDate = parseMatchDate(dateStr);
-  if (isNaN(matchDate.getTime())) return false;
-  return new Date() > matchDate;
+  });
 }
 
 function calcPts(pred, score) {
@@ -180,7 +208,7 @@ function calcPts(pred, score) {
   return pR===sR?3:0;
 }
 
-function recalcAllPoints() {
+function recalculateAllCloudPoints() {
   appState.users.forEach(u => {
     let t = 0;
     for (const [id, p] of Object.entries(u.preds || {})) { const s = appState.scores[id]; if (s) t += calcPts(p, s); }
@@ -201,16 +229,28 @@ function getUserStats(u) {
 }
 
 function getSorted() { return [...appState.users].sort((a,b) => b.points - a.points); }
+function getAvatarColor(u) { return AVATAR_COLORS[(u||'A').charCodeAt(0)%AVATAR_COLORS.length]; }
 
-// ==========================================
-// DÉMARRAGE ET UI
-// ==========================================
+function applyTheme() {
+  document.documentElement.style.setProperty('--accent', appState.settings.themeColor || '#00E676');
+  const authScreen = document.getElementById('authScreen');
+  if (authScreen) authScreen.style.backgroundImage = appState.settings.authBgImage ? `url('${appState.settings.authBgImage}')` : 'none';
+  
+  let bg = appState.settings.bgImage;
+  if (currentLeague === 'dashboard' && appState.settings.dashboardBgImage) bg = appState.settings.dashboardBgImage;
+  else if (currentLeague !== 'all' && currentLeague !== 'dashboard' && LEAGUE_INFO[currentLeague]) {
+    bg = (appState.settings.leagueBackgrounds && appState.settings.leagueBackgrounds[currentLeague]) || LEAGUE_INFO[currentLeague].defaultBg;
+  }
+  document.documentElement.style.setProperty('--bg-image', bg ? `url('${bg}')` : 'none');
+}
+
 function init() {
   if (appState.users.length === 0) {
     appState.users.push({ id:'admin', username:'Admin', email:'admin@pronofoot.com', pass:'admin123', role:'admin', points:0, preds:{} });
   }
-  recalcAllPoints();
-  fetchSupabaseData();
+
+  recalculateAllCloudPoints();
+  listenCloudData();
   setupMonthFilter();
 
   if (currentUser) { document.getElementById('authScreen').style.display = 'none'; setupApp(); } 
@@ -222,33 +262,115 @@ function setupApp() {
   if (currentUser && currentUser.role === 'admin') {
     document.getElementById('adminNavBtn').style.display = 'flex';
     document.getElementById('topAdminBtn').style.display = 'block';
-    renderAdminMatchList();
-    if(document.getElementById('adminApiKeyInput')) document.getElementById('adminApiKeyInput').value = REAL_API_KEY;
+    renderAdminMatchList(); renderAdminStats();
+  } else {
+    document.getElementById('adminNavBtn').style.display = 'none';
+    document.getElementById('topAdminBtn').style.display = 'none';
   }
 }
 
-// 👁️ ANTI-TRICHE : Voir les pronos des autres (Visible avec "✔️ A parié" avant match, Dévoilé après match)
+function switchAuth(tab) {
+  document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('authError').style.display = 'none';
+  if (tab === 'login') {
+    document.querySelectorAll('.auth-tab')[0].classList.add('active');
+    document.getElementById('loginForm').style.display = 'block';
+    document.getElementById('registerForm').style.display = 'none';
+  } else {
+    document.querySelectorAll('.auth-tab')[1].classList.add('active');
+    document.getElementById('loginForm').style.display = 'none';
+    document.getElementById('registerForm').style.display = 'block';
+  }
+}
+
+async function handleLogin(e) {
+  e.preventDefault();
+  const userOrEmail = document.getElementById('loginEmail').value.trim().toLowerCase();
+  const pass = document.getElementById('loginPass').value;
+  const btn = document.getElementById('loginBtn');
+  btn.innerText = "⏳ Connexion..."; btn.disabled = true;
+
+  if (firestore && appState.users.length <= 1) {
+    try {
+      const snap = await firestore.collection('users').get();
+      if (!snap.empty) appState.users = snap.docs.map(d => ({id: d.id, ...d.data()}));
+    } catch(err) {}
+  }
+
+  const found = appState.users.find(u => (u.email.toLowerCase() === userOrEmail || u.username.toLowerCase() === userOrEmail) && u.pass === pass);
+
+  if (found) {
+    currentUser = found;
+    localStorage.setItem('pf_cloud_session', JSON.stringify(currentUser));
+    document.getElementById('authScreen').style.display = 'none';
+    setupApp(); btn.innerText = "Se connecter →"; btn.disabled = false; return;
+  }
+
+  document.getElementById('authError').textContent = 'Identifiant ou mot de passe incorrect.';
+  document.getElementById('authError').style.display = 'block';
+  btn.innerText = "Se connecter →"; btn.disabled = false;
+}
+
+async function handleRegister(e) {
+  e.preventDefault();
+  const username = document.getElementById('regUser').value.trim();
+  const email = document.getElementById('regEmail').value.trim();
+  const pass = document.getElementById('regPass').value;
+  const btn = document.getElementById('registerBtn');
+  btn.innerText = "⏳ Création..."; btn.disabled = true;
+
+  if (appState.users.find(u => u.username.toLowerCase() === username.toLowerCase())) {
+    document.getElementById('authError').textContent = 'Pseudo déjà utilisé.';
+    document.getElementById('authError').style.display = 'block';
+    btn.innerText = "Créer mon compte →"; btn.disabled = false; return;
+  }
+
+  const newUser = { id: 'u_' + Date.now(), username, email, pass, role: 'user', points: 0, preds: {}, createdAt: new Date().toISOString() };
+  if (firestore) { try { const ref = await firestore.collection('users').add(newUser); newUser.id = ref.id; } catch (e) {} }
+  appState.users.push(newUser);
+  currentUser = newUser;
+  localStorage.setItem('pf_cloud_session', JSON.stringify(currentUser));
+  document.getElementById('authScreen').style.display = 'none';
+  setupApp(); btn.innerText = "Créer mon compte →"; btn.disabled = false;
+}
+
+function handleLogout() { localStorage.removeItem('pf_cloud_session'); currentUser = null; location.reload(); }
+function togglePassword(id) { const input = document.getElementById(id); input.type = input.type === "password" ? "text" : "password"; }
+
+function setupMonthFilter() {
+  const d = new Date();
+  currentMonth = (d.getMonth() + 1).toString().padStart(2, '0');
+  const bar = document.getElementById('monthFilterBar');
+  if (!bar) return;
+  const months = [{val:'all', lbl:'Toute l\'année'}, {val:'08',lbl:'Août'}, {val:'09',lbl:'Sept.'}, {val:'10',lbl:'Oct.'}, {val:'11',lbl:'Nov.'}, {val:'12',lbl:'Déc.'}, {val:'01',lbl:'Janv.'}, {val:'02',lbl:'Févr.'}, {val:'03',lbl:'Mars'}, {val:'04',lbl:'Avril'}, {val:'05',lbl:'Mai'}];
+  let html = ''; months.forEach(mo => { const isAct = mo.val === currentMonth; html += `<button class="matchday-pill ${isAct?'active':''}" onclick="filterByMonth('${mo.val}')">${mo.lbl}</button>`; });
+  bar.innerHTML = html;
+}
+
+function filterByMonth(m) { currentMonth = m; document.querySelectorAll('#monthFilterBar .matchday-pill').forEach(b => b.classList.remove('active')); if (event && event.target) event.target.classList.add('active'); renderMatches(); }
+function filterLeague(l) { currentLeague = l; applyTheme(); document.querySelectorAll('#page-matches .league-tab').forEach(t => t.classList.remove('active')); if (event && event.target) event.target.classList.add('active'); renderMatches(); }
+
+// VISIBILITÉ DES PRONOSTICS DES AUTRES (VOIR QUI A PRONOSTIQUÉ AVANT MATCH)
 function toggleMatchPredictions(matchId, matchDateStr) {
   const el = document.getElementById('all_preds_' + matchId);
   if (!el) return;
 
+  const started = hasMatchStarted(matchDateStr);
+  const isAdmin = (currentUser && currentUser.role === 'admin');
+
   if (el.style.display === 'none') {
-    const started = hasMatchStarted(matchDateStr);
-    const isAdmin = (currentUser && currentUser.role === 'admin');
     const score = appState.scores[matchId];
-    
     let html = '<div style="font-weight:bold;color:var(--gold);margin-bottom:8px;border-bottom:1px solid var(--border);padding-bottom:4px">👥 Pronostics des joueurs :</div>';
     let count = 0;
-    
+
     appState.users.forEach(u => {
       const pred = u.preds && u.preds[matchId];
       if (pred && pred.h !== '' && pred.a !== '') {
         count++;
-        // Si le match n'a pas commencé ET que l'on n'est pas Admin : on masque le score
         if (!started && !isAdmin) {
-          html += `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:0.85rem"><span style="flex:1"><strong>${u.username}</strong></span><span style="color:var(--green)">✔️ A parié</span></div>`;
+          // Masqué jusqu'au coup d'envoi pour éviter la triche
+          html += `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:0.85rem"><span><strong>${u.username}</strong></span><span style="margin-left:auto;color:var(--green)">✔️ A parié</span></div>`;
         } else {
-          // Sinon on montre le score et les points gagnés
           let resLbl = '';
           if (score) { const pts = calcPts(pred, score); resLbl = `<span class="${pts===5?'pts-exact':pts===3?'pts-correct':'pts-wrong'}" style="margin-left:auto;font-weight:bold">(+${pts} pts)</span>`; }
           html += `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:0.85rem"><span style="flex:1"><strong>${u.username}</strong></span><span style="background:var(--bg-body);padding:2px 8px;border-radius:4px;font-weight:bold">${pred.h} - ${pred.a}</span>${resLbl}</div>`;
@@ -256,7 +378,7 @@ function toggleMatchPredictions(matchId, matchDateStr) {
       }
     });
 
-    if (count === 0) html += '<p style="color:var(--text-muted);font-size:0.8rem">Aucun joueur n\'a pronostiqué ce match.</p>';
+    if (count === 0) html += '<p style="color:var(--text-muted);font-size:0.8rem">Aucun joueur n\'a encore pronostiqué ce match.</p>';
     el.innerHTML = html; el.style.display = 'block';
   } else { el.style.display = 'none'; }
 }
@@ -270,6 +392,7 @@ function renderMatches() {
 
   let html = '';
   list.forEach(m => {
+    // PRONO DU JOUEUR CONNECTÉ
     const pred = (currentUser && currentUser.preds && currentUser.preds[m.id]) || { h:'', a:'' };
     const score = appState.scores[m.id];
     const done = !!score;
@@ -281,11 +404,11 @@ function renderMatches() {
     if (done) {
       const pts = calcPts(pred, score);
       const cls = pts===5?'pts-exact':pts===3?'pts-correct':'pts-wrong';
-      const lbl = pts===5?'🎯 Exact (+5)':pts===3?'✅ Bon (+3)':'❌ Faux (0)';
+      const lbl = pts===5?'🎯 Score Exact (+5 pts)':pts===3?'✅ Bon Vainqueur (+3 pts)':'❌ Incorrect (0 pt)';
       res = `<div class="match-result-badge ${cls}">Score Final : ${score.h} - ${score.a} | ${lbl}</div>`;
     }
 
-    const disableInput = (started || done) ? 'disabled' : '';
+    const disableInput = (done) ? 'disabled' : '';
 
     html += `
       <div class="match-card ${done?'finished':''}">
@@ -301,15 +424,16 @@ function renderMatches() {
           <input type="number" min="0" max="15" value="${pred.a}" id="a_${m.id}" placeholder="A" ${disableInput}>
         </div>` : ''}
         ${res}
-        <div style="text-align:center;margin-top:12px;border-top:1px dashed var(--border);padding-top:10px">
-          <button class="btn btn-secondary btn-xs" onclick="toggleMatchPredictions('${m.id}', '${m.date}')">👥 Voir les pronos (${totalPreds})</button>
+        <div style="text-align:center;margin-top:12px;border-top:1px solid var(--border);padding-top:8px">
+          <button class="btn btn-secondary btn-xs" onclick="toggleMatchPredictions('${m.id}', '${m.date}')">👥 Voir les pronos de tous (${totalPreds})</button>
         </div>
-        <div id="all_preds_${m.id}" style="display:none;margin-top:10px;padding:10px;background:#111;border-radius:8px;border:1px solid var(--border)"></div>
+        <div id="all_preds_${m.id}" style="display:none;margin-top:10px;padding:10px;background:var(--bg-body);border-radius:8px;border:1px solid var(--border)"></div>
       </div>`;
   });
   container.innerHTML = html;
 }
 
+// SAUVEGARDE EN DIRECT FIREBASE
 async function saveAll() {
   if (!currentUser) return;
   if (!currentUser.preds) currentUser.preds = {};
@@ -329,24 +453,125 @@ async function saveAll() {
   const idx = appState.users.findIndex(u => u.id === currentUser.id);
   if (idx !== -1) appState.users[idx] = currentUser;
 
-  if (supabase) { 
-    try { await supabase.from('profiles').update({ preds: currentUser.preds }).eq('id', currentUser.id); } catch (err) {} 
+  if (firestore) {
+    try { await firestore.collection('users').doc(currentUser.id).set({ preds: currentUser.preds }, { merge: true }); } catch (err) {}
   }
   
-  localStorage.setItem('pf_session', JSON.stringify(currentUser));
-  recalcAllPoints(); updateUI(); renderMatches(); renderLeaderboard(); renderDashboardLeaderboard();
+  localStorage.setItem('pf_cloud_session', JSON.stringify(currentUser));
+  recalculateAllCloudPoints(); updateUI(); renderMatches(); renderLeaderboard(); renderDashboardLeaderboard();
   
-  if(btn) { btn.innerHTML = "✅ "+count+" Sauvegardés"; btn.disabled = false; setTimeout(()=>{btn.innerHTML="💾 Sauvegarder Mes Pronos";}, 2000); }
+  if(btn) { btn.innerHTML = "✅ "+count+" Enregistrés"; btn.disabled = false; setTimeout(()=>{btn.innerHTML="💾 Sauvegarder Mes Pronos";}, 2000); }
+}
+
+function shareChallengeWhatsApp() {
+  if (!currentUser) return;
+  const sorted = getSorted();
+  const rank = sorted.findIndex(u => u.id === currentUser.id) + 1;
+  const st = getUserStats(currentUser);
+  const url = window.location.href;
+  const msg = `🏆 *PRONOFOOT 2026-27*\n👤 Joueur : *${currentUser.username}*\n⭐ Points : *${currentUser.points} pts*\n🥇 Rang : *#${rank > 0 ? rank : 1}*\n📈 Réussite : *${st.winRate}%*\n\n🔥 Rejoins-moi et fais tes pronostics :\n👉 ${url}`;
+  window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`, '_blank');
 }
 
 function updateUI() {
   if (!currentUser) return;
+  document.getElementById('navPoints').textContent = (currentUser.points || 0) + ' pts';
+  const navAv = document.getElementById('navAvatar');
+  if (currentUser.avatar) { navAv.textContent = ''; navAv.style.backgroundImage = `url('${currentUser.avatar}')`; navAv.style.backgroundSize = 'cover'; } 
+  else { navAv.style.backgroundImage = 'none'; navAv.textContent = (currentUser.username || 'A')[0].toUpperCase(); }
+  
   const st = getUserStats(currentUser);
+  document.getElementById('statPoints').textContent = currentUser.points || 0;
+  document.getElementById('statPredictions').textContent = st.total;
+  document.getElementById('statExact').textContent = st.exact;
   
-  const wRate = document.getElementById('statWinRate'); if (wRate) wRate.textContent = st.winRate + '%';
-  const eRate = document.getElementById('statExactRate'); if (eRate) eRate.textContent = st.exactRate + '%';
+  const sorted = getSorted();
+  const rankIdx = sorted.findIndex(u => u.id === currentUser.id);
+  const rankStr = rankIdx >= 0 ? '#' + (rankIdx + 1) : '#1';
+  document.getElementById('statRank').textContent = rankStr;
   
-  // Reste du code UI classique...
+  document.getElementById('profileUsername').textContent = currentUser.username || '-';
+  document.getElementById('profileEmail').textContent = currentUser.email || '-';
+  document.getElementById('profileRole').textContent = currentUser.role === 'admin' ? '⭐ Administrateur' : '🎮 Joueur';
+  document.getElementById('profilePoints').textContent = currentUser.points || 0;
+  document.getElementById('profileRank').textContent = rankStr;
+
+  const profAv = document.getElementById('profileBigAvatar');
+  if (profAv) {
+    if (currentUser.avatar) { profAv.textContent = ''; profAv.style.backgroundImage = `url('${currentUser.avatar}')`; profAv.style.backgroundSize = 'cover'; } 
+    else { profAv.style.backgroundImage = 'none'; profAv.textContent = (currentUser.username || 'A')[0].toUpperCase(); }
+  }
+
+  if (sorted[0]) {
+    document.getElementById('kingUsername').textContent = sorted[0].username;
+    document.getElementById('kingPoints').textContent = sorted[0].points + ' pts';
+  }
+}
+
+function renderDashboardLeaderboard() {
+  const sorted = getSorted(); const max = sorted[0]?.points || 1; let html = '';
+  sorted.slice(0, 5).forEach((u, i) => {
+    const isMe = currentUser && u.id === currentUser.id;
+    const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':'';
+    const pct = max > 0 ? Math.round((u.points / max) * 100) : 0;
+    html += `<div style="display:flex;align-items:center;gap:10px;padding:10px;background:${isMe?'rgba(0,230,118,0.1)':'var(--bg-card)'};border:1px solid ${isMe?'var(--accent)':'var(--border)'};border-radius:8px;margin-bottom:6px"><span style="font-weight:800;min-width:30px;color:${i<3?'var(--gold)':'var(--text-muted)'}">${medal||'#'+(i+1)}</span><div style="flex:1"><div style="font-weight:700;font-size:0.9rem">${u.username} ${u.role==='admin'?'⭐':''}</div><div style="height:4px;background:var(--bg-body);border-radius:2px;margin-top:4px"><div style="height:100%;width:${pct}%;background:var(--accent);border-radius:2px"></div></div></div><span style="font-weight:800;color:var(--gold)">${u.points} pts</span></div>`;
+  });
+  document.getElementById('dashboardLeaderboard').innerHTML = html;
+}
+
+function renderLeaderboard() {
+  const sorted = getSorted();
+  let html = '<table class="leaderboard-table"><thead><tr><th>#</th><th>Joueur</th><th>Pronos</th><th>✅ Exact</th><th>🎯 Bon</th><th>Points</th></tr></thead><tbody>';
+  sorted.forEach((u, i) => {
+    const isMe = currentUser && u.id === currentUser.id;
+    const st = getUserStats(u);
+    const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':'#'+(i+1);
+    html += `<tr class="${isMe?'current-user':''}"><td>${medal}</td><td><strong>${u.username}</strong> ${u.role==='admin'?'⭐':''}</td><td>${st.total}</td><td style="color:var(--gold);font-weight:bold">${st.exact}</td><td style="color:var(--green);font-weight:bold">${st.correct}</td><td style="font-size:1.1rem;font-weight:800">${u.points} pts</td></tr>`;
+  });
+  html += '</tbody></table>';
+  document.getElementById('leaderboardContainer').innerHTML = html;
+}
+
+function renderAdminMatchList() {
+  let html = '';
+  ALL_MATCHES.slice(0, 50).forEach(m => {
+    const s = appState.scores[m.id];
+    html += `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);flex-wrap:wrap"><span style="font-size:0.75rem;color:var(--text-dim);min-width:70px">${m.date}</span><span style="flex:1;font-size:0.85rem;min-width:140px">${m.home} vs ${m.away}</span><input type="number" min="0" max="15" value="${s?s.h:''}" id="ah_${m.id}" placeholder="H" style="width:38px;padding:5px;text-align:center;background:var(--bg-body);color:white;border-radius:4px"><input type="number" min="0" max="15" value="${s?s.a:''}" id="aa_${m.id}" placeholder="A" style="width:38px;padding:5px;text-align:center;background:var(--bg-body);color:white;border-radius:4px"><button class="btn btn-primary btn-xs" onclick="adminSaveScore('${m.id}')">Valider</button></div>`;
+  });
+  document.getElementById('adminMatchList').innerHTML = html;
+}
+
+async function adminSaveScore(id) {
+  const h = parseInt(document.getElementById('ah_' + id)?.value);
+  const a = parseInt(document.getElementById('aa_' + id)?.value);
+  if (isNaN(h) || isNaN(a)) { alert('Entrez les 2 scores !'); return; }
+  appState.scores[id] = { h, a };
+  if (firestore) { try { await firestore.collection('settings').doc('global').set({ scores: appState.scores }, { merge: true }); } catch (e) {} }
+  recalculateAllCloudPoints(); updateUI(); renderMatches(); renderLeaderboard(); renderDashboardLeaderboard();
+  alert('Score enregistré !');
+}
+
+function renderAdminStats() {
+  const t = ALL_MATCHES.length;
+  const s = Object.keys(appState.scores).length;
+  const p = appState.users.reduce((a, u) => a + Object.keys(u.preds || {}).length, 0);
+  document.getElementById('adminStats').innerHTML = `
+    <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)"><span>Matchs 2026-27</span><strong>${t}</strong></div>
+    <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)"><span>Scores validés</span><strong style="color:var(--green)">${s}</strong></div>
+    <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)"><span>Joueurs inscrits</span><strong>${appState.users.length}</strong></div>
+    <div style="display:flex;justify-content:space-between;padding:6px 0"><span>Pronostics totaux sur le site</span><strong style="color:var(--gold);font-size:1.2rem">${p}</strong></div>`;
+}
+
+function navigateTo(p) {
+  if (p === 'admin') { if (!currentUser || currentUser.role !== 'admin') { alert("⛔ Accès refusé ! Réservé à l'administrateur."); return; } }
+  if (p === 'dashboard') { currentLeague = 'dashboard'; applyTheme(); } else { currentLeague = 'all'; applyTheme(); }
+  document.querySelectorAll('.page-section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.bottom-nav-item').forEach(b => b.classList.remove('active'));
+  const page = document.getElementById('page-' + p);
+  if (page) page.classList.add('active');
+  const btn = document.querySelector(`[onclick="navigateTo('${p}')"]`);
+  if (btn) btn.classList.add('active');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 window.onload = init;
