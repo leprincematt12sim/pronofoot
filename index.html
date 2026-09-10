@@ -28,7 +28,6 @@
 
       <div id="authError" style="color:var(--danger);font-size:0.85rem;margin-bottom:12px;display:none;text-align:center;font-weight:bold"></div>
 
-      <!-- Connexion -->
       <form id="loginForm" onsubmit="handleLogin(event)">
         <div class="form-group"><label data-i18n="email">Email / Pseudo</label><input type="text" id="loginEmail" placeholder="ton@email.com" required></div>
         <div class="form-group">
@@ -42,7 +41,6 @@
         </div>
       </form>
 
-      <!-- Inscription -->
       <form id="registerForm" style="display:none" onsubmit="handleRegister(event)">
         <div class="form-group"><label data-i18n="pseudo">Pseudo de joueur</label><input type="text" id="regUser" placeholder="Ex: Mathis_92" required minlength="3"></div>
         <div class="form-group"><label data-i18n="email">Email</label><input type="email" id="regEmail" placeholder="ton@email.com" required></div>
@@ -176,7 +174,7 @@
         <div id="leaderboardContainer"></div>
       </div>
 
-      <!-- GROUPES -->
+      <!-- GROUPES PRIVÉS -->
       <div class="page-section" id="page-groups">
         <h3 style="margin-bottom:5px" class="league-title-special" data-i18n="nav_groups">👥 Mes Groupes Privés</h3>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
@@ -192,23 +190,37 @@
         <div class="admin-card" style="text-align:center;max-width:400px;margin:0 auto">
           <label style="cursor:pointer;display:block;margin:0 auto 12px;width:100px;height:100px;border-radius:50%;position:relative" title="Cliquez pour changer votre photo">
             <div class="profile-avatar-large" id="profileBigAvatar">?</div>
+            <div class="profile-avatar-overlay" style="position:absolute;inset:0;background:rgba(0,0,0,0.5);border-radius:50%;display:flex;align-items:center;justify-content:center;opacity:0;transition:0.2s"><span style="font-size:1.5rem">📸</span></div>
             <input type="file" accept="image/*" style="display:none" onchange="uploadUserAvatar(event)">
           </label>
-
           <h2 id="profileUsername">-</h2>
           <p id="profileEmail" style="color:var(--text-muted);font-size:0.85rem;margin-bottom:8px">-</p>
-          <p id="profileRole" style="color:var(--gold);font-size:0.85rem;font-weight:bold;margin-bottom:20px"></p>
+          <p id="profileRole" style="color:var(--gold);font-size:0.85rem;font-weight:bold;margin-bottom:15px"></p>
+
+          <div class="stats-grid" style="margin-bottom:15px">
+            <div class="stat-card" style="padding:12px">
+              <div class="val" id="profilePoints" style="font-size:1.5rem;color:var(--accent)">0</div>
+              <div class="lbl" style="font-size:0.7rem">Solde Points</div>
+            </div>
+            <div class="stat-card" style="padding:12px">
+              <div class="val" id="profileRank" style="font-size:1.5rem;color:var(--gold)">#-</div>
+              <div class="lbl" style="font-size:0.7rem">Rang Officiel</div>
+            </div>
+          </div>
 
           <button class="btn btn-secondary" style="width:100%" onclick="handleLogout()">🚪 Se Déconnecter</button>
         </div>
+
+        <h3 style="margin-top:20px;margin-bottom:15px" class="league-title-special">📝 Mes Pronostics Enregistrés</h3>
+        <div id="myPredictionsList" style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:15px;max-height:400px;overflow-y:auto"></div>
       </div>
 
-      <!-- ADMIN SÉCURISÉ ET COMPLET -->
+      <!-- ADMIN SÉCURISÉ -->
       <div class="page-section" id="page-admin">
         <h3 class="league-title-special" style="margin-bottom:15px">⚙️ Panneau Administrateur</h3>
 
         <div class="admin-card" style="border:2px solid var(--gold)">
-          <h4 style="color:var(--gold)">⚡ Synchro API Sports (Vrais Scores)</h4>
+          <h4 style="color:var(--gold)">⚡ Synchro API Sports</h4>
           <button class="btn btn-gold btn-sm" id="btnSyncApi" style="width:100%" onclick="saveAndSyncApiSports()">⚡ Lancer Synchro API Directe</button>
         </div>
 
@@ -228,6 +240,7 @@
             <input type="text" id="adminSearchInput" placeholder="🔍 Rechercher un club (ex: PSG)..." style="width:100%;padding:10px;margin-bottom:10px;background:var(--bg-body);color:white;border:1px solid var(--border);border-radius:6px;" oninput="renderAdminMatchList()">
             <div id="adminMatchList" style="max-height:420px;overflow-y:auto;border:1px solid var(--border);padding:10px;border-radius:8px"></div>
           </div>
+
           <div class="admin-card">
             <h4>📊 Stats Cloud</h4>
             <div id="adminStats"></div>
