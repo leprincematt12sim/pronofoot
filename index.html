@@ -3,99 +3,101 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>PronoFoot PRO — Saison 2026-27</title>
+  <title>PronoFoot PRO — Saison 2026-27 (Supabase Cloud)</title>
   <link rel="stylesheet" href="css/main.css">
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <!-- SUPABASE SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-  <audio id="siteAudioPlayer"></audio>
 
   <!-- AUTHENTIFICATION -->
   <div class="auth-overlay" id="authScreen" style="display:none">
     <div class="auth-card">
       <div class="auth-header">
         <h1>Prono<span>Foot</span></h1>
-        <p>Saison 2026-27 — Multijoueur en Direct</p>
+        <p>Saison 2026-27 — Propulsé par Supabase</p>
       </div>
+
       <div class="auth-tabs">
-        <button class="auth-tab active" onclick="switchAuth('login')" id="tabLogin">Connexion</button>
-        <button class="auth-tab" onclick="switchAuth('register')" id="tabReg">Inscription</button>
+        <button class="auth-tab active" onclick="switchAuth('login')">Connexion</button>
+        <button class="auth-tab" onclick="switchAuth('register')">Inscription</button>
       </div>
       <div id="authError" style="color:var(--danger);font-size:0.85rem;margin-bottom:12px;display:none;text-align:center;font-weight:bold"></div>
 
+      <!-- Connexion -->
       <form id="loginForm" onsubmit="handleLogin(event)">
-        <div class="form-group"><label>📧 Email ou Pseudo</label><input type="text" id="loginEmail" placeholder="ton@email.com" required></div>
-        <div class="form-group"><label>🔒 Mot de passe</label><input type="password" id="loginPass" placeholder="••••••••" required></div>
-        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:10px" id="loginBtn">Se connecter →</button>
-        <div style="text-align:center;margin-top:15px"><a style="color:var(--gold);font-size:0.8rem;cursor:pointer" onclick="forgotPassword()">Mot de passe oublié ?</a></div>
+        <div class="form-group"><label>📧 Email ou Pseudo</label><input type="text" id="loginEmail" required></div>
+        <div class="form-group">
+          <label>🔒 Mot de passe</label>
+          <input type="password" id="loginPass" required>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:10px">Se connecter →</button>
       </form>
 
+      <!-- Inscription -->
       <form id="registerForm" style="display:none" onsubmit="handleRegister(event)">
-        <div class="form-group"><label>👤 Pseudo</label><input type="text" id="regUser" placeholder="Ex: Mathis_92" required></div>
-        <div class="form-group"><label>📧 Email</label><input type="email" id="regEmail" placeholder="ton@email.com" required></div>
-        <div class="form-group"><label>🔒 Mot de passe</label><input type="password" id="regPass" placeholder="Min. 6 caractères" required></div>
-        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:10px" id="registerBtn">Créer mon compte →</button>
+        <div class="form-group"><label>👤 Pseudo</label><input type="text" id="regUser" required></div>
+        <div class="form-group"><label>📧 Email</label><input type="email" id="regEmail" required></div>
+        <div class="form-group"><label>🔒 Mot de passe</label><input type="password" id="regPass" required minlength="6"></div>
+        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:10px">Créer mon compte →</button>
       </form>
     </div>
   </div>
 
+  <!-- APPLICATION -->
   <div id="appContainer">
-    <!-- TOP NAV -->
     <nav class="top-nav">
-      <div class="nav-brand" onclick="navigateTo('dashboard')">Prono<span>Foot</span></div>
-      <div class="music-widget">
-        <div style="display:flex;align-items:center;gap:6px" onclick="toggleSiteMusic()"><span id="musicStatusIcon">🎵</span><span class="music-title" id="musicTitleDisplay">Musique Off</span></div>
-        <div class="music-panel" id="musicPlaylistPanel">
-          <div class="music-controls"><button class="music-btn" onclick="prevSong()">⏮</button><button class="music-btn" onclick="toggleSiteMusic()" id="musicPlayBtn">▶️</button><button class="music-btn" onclick="nextSong()">⏭</button></div>
-          <div id="playlistContainer" style="max-height:100px;overflow-y:auto;display:flex;flex-direction:column;gap:2px"></div>
-        </div>
-      </div>
+      <!-- LE SECRET ADMIN EST ICI : Clic 5 fois sur le Logo pour forcer l'accès Admin -->
+      <div class="nav-brand" onclick="secretAdminUnlock()">Prono<span>Foot</span></div>
       <div class="nav-user">
-        <button class="nav-admin-badge" id="topAdminBtn" onclick="navigateTo('admin')" style="display:none">⚙️ Admin</button>
+        <button class="btn btn-secondary btn-xs" id="topAdminBtn" onclick="navigateTo('admin')" style="display:none;border-color:var(--accent);color:var(--accent)">⚙️ ADMIN</button>
         <div class="nav-points" id="navPoints">0 pts</div>
         <div class="nav-avatar" id="navAvatar" onclick="navigateTo('profile')">?</div>
       </div>
     </nav>
 
-    <!-- BOTTOM NAV -->
     <nav class="bottom-nav">
       <button class="bottom-nav-item active" onclick="navigateTo('dashboard')"><span>🏠</span><span>Accueil</span></button>
       <button class="bottom-nav-item" onclick="navigateTo('matches')"><span>⚽</span><span>Matchs</span></button>
-      <button class="bottom-nav-item" onclick="navigateTo('leaderboard')"><span>🏆</span><span>Général</span></button>
-      <button class="bottom-nav-item" onclick="navigateTo('groups')"><span>👥</span><span>Groupes</span></button>
-      <button class="bottom-nav-item" onclick="navigateTo('admin')" id="adminNavBtn" style="display:none"><span>⚙️</span><span>Admin</span></button>
+      <button class="bottom-nav-item" onclick="navigateTo('leaderboard')"><span>🏆</span><span>Classement</span></button>
+      <button class="bottom-nav-item" onclick="navigateTo('profile')"><span>👤</span><span>Profil</span></button>
+      <button class="bottom-nav-item" onclick="navigateTo('admin')" id="adminNavBtn" style="display:none;color:var(--accent)"><span>⚙️</span><span>Admin</span></button>
     </nav>
 
     <div class="main-content">
+
       <!-- DASHBOARD -->
       <div class="page-section active" id="page-dashboard">
-        <div class="welcome-banner"><h2 id="welcomeMsg">Bienvenue ! 👋</h2><p>Pronostique les matchs de la saison 2026-27 !</p></div>
-        <div id="kingBannerBox" class="king-banner"><div style="font-size:2.5rem">👑</div><div><div style="font-size:0.75rem;color:var(--gold);font-weight:bold;text-transform:uppercase">Leader Actuel du Classement</div><div id="kingUsername" style="font-size:1.1rem;font-weight:900">-</div><div id="kingPoints" style="font-size:0.85rem;color:var(--text-muted)">- pts</div></div></div>
-        <div id="announcementBox" style="display:none;background:var(--bg-card);border:1px solid var(--gold);padding:12px 16px;border-radius:var(--radius-sm);margin-bottom:20px;color:var(--gold)">📢 <span id="announcementText"></span></div>
+        <div class="welcome-banner">
+          <h2 id="welcomeMsg">Bienvenue ! 👋</h2>
+          <p>Pronostique les matchs de la saison 2026-27 en direct !</p>
+        </div>
+
+        <div id="announcementBox" style="display:none;background:var(--bg-card);border:1px solid var(--gold);padding:12px 16px;border-radius:var(--radius-sm);margin-bottom:20px;color:var(--gold);font-weight:bold"></div>
+
         <div class="stats-grid">
           <div class="stat-card"><div class="val" id="statPoints">0</div><div class="lbl">Mes Points</div></div>
-          <div class="stat-card"><div class="val" id="statRank">#-</div><div class="lbl">Mon Rang Global</div></div>
-          <div class="stat-card"><div class="val" id="statPredictions">0</div><div class="lbl">Mes Pronos</div></div>
-          <div class="stat-card"><div class="val" id="statExact">0</div><div class="lbl">Scores Exacts (+5)</div></div>
+          <div class="stat-card"><div class="val" id="statRank">#-</div><div class="lbl">Rang Global</div></div>
         </div>
-        <div style="margin-bottom:20px"><button class="btn btn-whatsapp" style="width:100%;padding:14px;font-size:1rem;margin-bottom:10px" onclick="shareChallengeWhatsApp()">🔥 Défier mes amis sur WhatsApp</button><button class="btn btn-primary" style="width:100%;padding:14px;font-size:1rem" onclick="navigateTo('matches')">⚽ Pronostiquer les prochains matchs →</button></div>
-        <h3 style="margin-bottom:12px">🏆 Top 5 Général</h3>
-        <div id="dashboardLeaderboard" style="margin-bottom:20px"></div>
+
+        <button class="btn btn-primary" style="width:100%;padding:14px;font-size:1.05rem;margin-bottom:20px" onclick="navigateTo('matches')">⚽ Faire mes pronostics →</button>
+
+        <h3 style="margin-bottom:12px" class="league-title-special">🏆 Top 5 Général</h3>
+        <div id="dashboardLeaderboard"></div>
       </div>
 
       <!-- MATCHS -->
       <div class="page-section" id="page-matches">
-        <div id="leagueBannerArea"></div>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:10px">
-          <h3 id="matchesSectionTitle" class="league-title-special">⚽ Calendrier 2026-27</h3>
-          <button class="btn btn-primary btn-sm" onclick="saveAll()">💾 Sauvegarder Pronos</button>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;flex-wrap:wrap;gap:10px">
+          <h3 class="league-title-special">⚽ Calendrier 2026-27</h3>
+          <button class="btn btn-primary btn-sm" onclick="saveAll()">💾 Sauvegarder</button>
         </div>
+
         <div style="display:flex;gap:10px;margin-bottom:15px">
-          <button class="btn btn-sm btn-primary" id="btnTabUpcoming" onclick="switchMatchView('upcoming')" style="flex:1">🔥 À venir & En Direct</button>
-          <button class="btn btn-sm btn-secondary" id="btnTabFinished" onclick="switchMatchView('finished')" style="flex:1">📜 Matchs Terminés</button>
+          <button class="btn btn-sm btn-primary" id="btnTabUpcoming" onclick="switchMatchView('upcoming')" style="flex:1">🔥 À venir & Live</button>
+          <button class="btn btn-sm btn-secondary" id="btnTabFinished" onclick="switchMatchView('finished')" style="flex:1">📜 Terminés</button>
         </div>
+
         <div class="league-tabs">
           <button class="league-tab active" onclick="filterLeague('all')">🌍 Tous</button>
           <button class="league-tab" onclick="filterLeague('champions')">🏆 UCL</button>
@@ -105,89 +107,96 @@
           <button class="league-tab" onclick="filterLeague('bundesliga')">🇩🇪 BuLi</button>
           <button class="league-tab" onclick="filterLeague('ligue1')">🇫🇷 L1</button>
         </div>
-        <div class="matchday-bar" id="monthFilterBar"></div>
+
         <div id="matchesContainer"></div>
       </div>
 
       <!-- CLASSEMENT -->
       <div class="page-section" id="page-leaderboard">
-        <h3 style="margin-bottom:5px" class="league-title-special">🏆 Classement Général</h3>
+        <h3 style="margin-bottom:15px" class="league-title-special">🏆 Classement Général</h3>
+        
+        <div class="league-tabs" style="margin-bottom:20px">
+          <button class="league-tab active" onclick="filterLeaderboard('all')">🌍 Global</button>
+          <button class="league-tab" onclick="filterLeaderboard('champions')">🏆 UCL</button>
+          <button class="league-tab" onclick="filterLeaderboard('premier')">🏴 PL</button>
+        </div>
+
         <div id="podiumContainer" style="margin-bottom:25px"></div>
         <div id="leaderboardContainer"></div>
       </div>
 
-      <!-- GROUPES PRIVÉS -->
-      <div class="page-section" id="page-groups">
-        <h3 style="margin-bottom:5px" class="league-title-special">👥 Mes Groupes Privés</h3>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
-          <button class="btn btn-primary" onclick="showCreateGroupPrompt()">➕ Créer un Groupe</button>
-          <button class="btn btn-gold" onclick="showJoinGroupPrompt()">🔑 Rejoindre (Code)</button>
-        </div>
-        <div id="groupsListContainer"></div>
-      </div>
-
-      <!-- PROFIL -->
+      <!-- PROFIL (AVEC STATS ET PRONOSTICS) -->
       <div class="page-section" id="page-profile">
-        <h3 style="margin-bottom:15px" class="league-title-special">👤 Mon Profil</h3>
-        <div class="admin-card" style="text-align:center;max-width:400px;margin:0 auto">
-          <label style="cursor:pointer;display:block;margin:0 auto 12px;width:100px;height:100px;border-radius:50%;position:relative">
+        <h3 style="margin-bottom:15px" class="league-title-special">👤 Mon Profil & Stats</h3>
+        
+        <div class="admin-card" style="text-align:center">
+          <label style="display:block;cursor:pointer">
             <div class="profile-avatar-large" id="profileBigAvatar">?</div>
-            <input type="file" accept="image/*" style="display:none" onchange="uploadToCloudinary(event, 'avatar')">
+            <input type="file" accept="image/*" style="display:none" onchange="uploadUserAvatar(event)">
           </label>
-          <h2 id="profileUsername">-</h2>
-          <p id="profileEmail" style="color:var(--text-muted);font-size:0.85rem;margin-bottom:20px">-</p>
-          <button class="btn btn-secondary" style="width:100%" onclick="handleLogout()">🚪 Se Déconnecter</button>
+          <h2 id="profileUsername" style="font-size:1.8rem;margin-bottom:5px">-</h2>
+          <p id="profileEmail" style="color:var(--text-muted);font-size:0.9rem;margin-bottom:15px">-</p>
+          
+          <div class="stats-grid">
+            <div class="stat-card"><div class="val" id="profileWinRate" style="color:var(--green)">0%</div><div class="lbl">Taux Réussite</div></div>
+            <div class="stat-card"><div class="val" id="profileExactRate" style="color:var(--gold)">0%</div><div class="lbl">Scores Exacts</div></div>
+            <div class="stat-card"><div class="val" id="profileTotalPreds">0</div><div class="lbl">Matchs Joués</div></div>
+          </div>
         </div>
+
+        <h3 style="margin-top:20px;margin-bottom:15px" class="league-title-special">📝 Mes Pronostics</h3>
+        <div id="myPredictionsList" style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:15px;max-height:400px;overflow-y:auto">
+          <!-- Rempli par JS -->
+        </div>
+
+        <button class="btn btn-secondary" style="width:100%;margin-top:20px" onclick="handleLogout()">🚪 Se Déconnecter</button>
       </div>
 
-      <!-- ============================================ -->
-      <!-- PANNEAU ADMINISTRATEUR COMPLET ET RESTAURÉ   -->
-      <!-- ============================================ -->
+      <!-- ADMIN (LES 10 OUTILS RESTAURÉS) -->
       <div class="page-section" id="page-admin">
         <h3 class="league-title-special" style="margin-bottom:15px">⚙️ Panneau Administrateur</h3>
 
-        <!-- 1. SYNCHRO API-SPORTS -->
-        <div class="admin-card" style="border:2px solid var(--gold)">
-          <h4 style="color:var(--gold)">⚡ Synchro API Sports (Vrais Scores)</h4>
-          <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:10px">Récupère les scores officiels des matchs terminés ou en cours :</p>
-          <button class="btn btn-gold btn-sm" id="btnSyncApi" style="width:100%" onclick="saveAndSyncApiSports()">⚡ Lancer Synchro API Directe</button>
-        </div>
-
-        <!-- 2. TESTEUR LIVE -->
-        <div class="admin-card" style="border:2px solid var(--danger)">
-          <h4 style="color:var(--danger)">🔴 Mode Testeur LIVE</h4>
-          <button class="btn btn-primary btn-sm" style="background:var(--danger);color:white;width:100%" onclick="adminSimulateLiveMatch()">🔴 Forcer 3 Matchs en LIVE (Test)</button>
-        </div>
-
         <div class="admin-grid">
-          <!-- 3. SAISIE MANUELLE + RECHERCHE -->
+          <!-- 1. API SPORTS -->
+          <div class="admin-card" style="border:2px solid var(--gold)">
+            <h4 style="color:var(--gold)">⚡ Synchro API-Sports</h4>
+            <button class="btn btn-gold btn-sm" id="btnSyncApi" style="width:100%" onclick="saveAndSyncApiSports()">⚡ Lancer Synchro Vrais Scores</button>
+          </div>
+
+          <!-- 2. TESTEUR LIVE -->
+          <div class="admin-card" style="border:2px solid var(--danger)">
+            <h4 style="color:var(--danger)">🔴 Testeur LIVE</h4>
+            <button class="btn btn-primary btn-sm" style="background:var(--danger);color:white;width:100%" onclick="adminSimulateLiveMatch()">🔴 Forcer 3 Matchs en LIVE</button>
+          </div>
+
+          <!-- 3. SAISIE MANUELLE + SIMULATION + RECHERCHE -->
           <div class="admin-card" style="grid-column:1/-1">
-            <h4>⚽ Saisie Manuelle des Scores</h4>
+            <h4>⚽ Saisie Manuelle & Simulation</h4>
             <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
               <button class="btn btn-primary btn-sm" onclick="adminSimulateScores()">🎲 Simuler 10 scores</button>
               <button class="btn btn-gold btn-sm" onclick="adminSimulateAll()">🎲 Simuler TOUT</button>
-              <button class="btn btn-secondary btn-sm" onclick="adminResetScores()">🗑️ Réinitialiser scores</button>
+              <button class="btn btn-secondary btn-sm" onclick="adminResetScores()">🗑️ Tout Réinitialiser</button>
             </div>
             <input type="text" id="adminSearchInput" placeholder="🔍 Rechercher un club (ex: PSG)..." style="width:100%;padding:10px;margin-bottom:10px;background:var(--bg-body);color:white;border:1px solid var(--border);border-radius:6px;" oninput="renderAdminMatchList()">
-            <div id="adminMatchList" style="max-height:420px;overflow-y:auto;border:1px solid var(--border);padding:10px;border-radius:8px"></div>
+            <div id="adminMatchList" style="max-height:350px;overflow-y:auto;border:1px solid var(--border);padding:10px;border-radius:8px"></div>
           </div>
 
-          <!-- 4. FONDS D'ÉCRAN GLOBAUX -->
+          <!-- 4. FONDS CONNEXION & ACCUEIL -->
           <div class="admin-card" style="grid-column:1/-1">
             <h4>🖼️ Fonds d'Écran Globaux</h4>
             <div style="display:flex;gap:10px;flex-wrap:wrap">
-              <label class="btn btn-secondary btn-sm" style="cursor:pointer;flex:1">📸 Fond Page Connexion<input type="file" accept="image/*" style="display:none" onchange="uploadToCloudinary(event, 'authBgImage')"></label>
-              <label class="btn btn-secondary btn-sm" style="cursor:pointer;flex:1">📸 Fond Accueil Dashboard<input type="file" accept="image/*" style="display:none" onchange="uploadToCloudinary(event, 'dashboardBgImage')"></label>
+              <label class="btn btn-secondary btn-sm" style="cursor:pointer;flex:1">📸 Fond Page Connexion<input type="file" accept="image/*" style="display:none" onchange="uploadAuthBgFromFile(event)"></label>
+              <label class="btn btn-secondary btn-sm" style="cursor:pointer;flex:1">📸 Fond Accueil Dashboard<input type="file" accept="image/*" style="display:none" onchange="uploadDashboardBgFromFile(event)"></label>
             </div>
           </div>
 
-          <!-- 5. BANNIÈRES PAR LIGUE -->
+          <!-- 5. BANNIÈRES LIGUES -->
           <div class="admin-card" style="grid-column:1/-1">
-            <h4>🏟️ Bannières (En-tête) par Championnat</h4>
+            <h4>🏟️ Bannières par Championnat</h4>
             <div id="adminLeagueBanners"></div>
           </div>
 
-          <!-- 6. FONDS PAR LIGUE -->
+          <!-- 6. FONDS LIGUES -->
           <div class="admin-card" style="grid-column:1/-1">
             <h4>🖼️ Arrière-plans par Championnat</h4>
             <div id="adminLeagueBackgrounds"></div>
@@ -195,15 +204,12 @@
 
           <!-- 7. PLAYLIST MP3 -->
           <div class="admin-card">
-            <h4>🎵 Playlist Musicale</h4>
-            <label class="btn btn-gold btn-sm" style="cursor:pointer;display:block;text-align:center;margin-bottom:10px">
-              ➕ Ajouter fichier MP3
-              <input type="file" accept="audio/*" style="display:none" onchange="uploadToCloudinary(event, 'music')">
-            </label>
-            <div id="adminPlaylistList" style="max-height:120px;overflow-y:auto"></div>
+            <h4>🎵 Playlist MP3</h4>
+            <label class="btn btn-secondary btn-sm" style="cursor:pointer;display:block;text-align:center">➕ Ajouter MP3<input type="file" accept="audio/*" style="display:none" onchange="adminAddMusic(event)"></label>
+            <div id="adminPlaylistList" style="margin-top:10px;font-size:0.8rem;max-height:100px;overflow-y:auto"></div>
           </div>
 
-          <!-- 8. THÈME ET COULEURS -->
+          <!-- 8. THEME -->
           <div class="admin-card">
             <h4>🎨 Couleur du Thème</h4>
             <div class="theme-colors">
@@ -222,13 +228,18 @@
             <button class="btn btn-gold btn-sm" style="width:100%" onclick="adminPublishAnnouncement()">Publier</button>
           </div>
 
-          <!-- 10. STATISTIQUES -->
+          <!-- 10. STATS -->
           <div class="admin-card">
             <h4>📊 Statistiques Cloud</h4>
             <div id="adminStats"></div>
           </div>
         </div>
       </div>
+
+    </div>
+
+    <div class="site-footer">
+      <p>⚽ PronoFoot — Compétition Européenne 2026-27</p>
     </div>
   </div>
 
