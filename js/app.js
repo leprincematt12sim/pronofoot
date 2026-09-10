@@ -1,313 +1,328 @@
-﻿const firebaseConfig = {
-  apiKey: "AIzaSyCINnc9gGuNl5oF_0GBYq4fnO6MMlW8DFs",
-  authDomain: "pronofoot-89f3e.firebaseapp.com",
-  projectId: "pronofoot-89f3e",
-  storageBucket: "pronofoot-89f3e.firebasestorage.app",
-  messagingSenderId: "163921400915",
-  appId: "1:163921400915:web:90d3b4ffeb1cb1bd99a2a6"
-};
+﻿// ==========================================
+// BASE DE DONNÉES MATCHS 2026-27 (ÉCHANTILLON)
+// ==========================================
+const ALL_MATCHES = [
+  { id: "pl_1", league: "Premier League", date: "21/08/2026", home: "Arsenal", away: "Coventry City" },
+  { id: "pl_2", league: "Premier League", date: "22/08/2026", home: "Hull City", away: "Manchester United" },
+  { id: "pl_3", league: "Premier League", date: "22/08/2026", home: "Brentford", away: "Tottenham" },
+  { id: "pl_4", league: "Premier League", date: "23/08/2026", home: "Newcastle", away: "Liverpool" },
+  { id: "pl_5", league: "Premier League", date: "28/08/2026", home: "Crystal Palace", away: "Manchester City" },
+  { id: "l1_1", league: "Ligue 1", date: "21/08/2026", home: "Olympique de Marseille", away: "Strasbourg" },
+  { id: "l1_2", league: "Ligue 1", date: "23/08/2026", home: "Rennes", away: "Paris Saint-Germain" },
+  { id: "es_1", league: "La Liga", date: "16/08/2026", home: "FC Barcelone", away: "Athletic Bilbao" },
+  { id: "es_2", league: "La Liga", date: "22/08/2026", home: "Espanyol", away: "Real Madrid" },
+  { id: "c1_1", league: "Champions League", date: "14/10/2026", home: "Manchester City", away: "Paris Saint-Germain" },
+  { id: "c1_2", league: "Champions League", date: "21/10/2026", home: "Real Madrid", away: "RB Leipzig" }
+];
 
-let firestore = null;
-try {
-  if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-  firestore = firebase.firestore();
-} catch (e) {}
-
-const TEAM_CRESTS = {
+// Dictionnaire des Logos HD
+const LOGOS = {
   "Arsenal": "https://media.api-sports.io/football/teams/42.png",
   "Manchester City": "https://media.api-sports.io/football/teams/50.png",
   "Liverpool": "https://media.api-sports.io/football/teams/40.png",
   "Manchester United": "https://media.api-sports.io/football/teams/33.png",
-  "Chelsea": "https://media.api-sports.io/football/teams/49.png",
   "Tottenham": "https://media.api-sports.io/football/teams/47.png",
   "Newcastle": "https://media.api-sports.io/football/teams/34.png",
   "Real Madrid": "https://media.api-sports.io/football/teams/541.png",
   "FC Barcelone": "https://media.api-sports.io/football/teams/529.png",
-  "Atlético Madrid": "https://media.api-sports.io/football/teams/530.png",
   "Paris Saint-Germain": "https://media.api-sports.io/football/teams/85.png",
-  "Olympique de Marseille": "https://media.api-sports.io/football/teams/81.png",
-  "Bayern Munich": "https://media.api-sports.io/football/teams/157.png",
-  "Borussia Dortmund": "https://media.api-sports.io/football/teams/165.png",
-  "Inter Milan": "https://media.api-sports.io/football/teams/505.png",
-  "AC Milan": "https://media.api-sports.io/football/teams/489.png",
-  "Juventus": "https://media.api-sports.io/football/teams/496.png",
-  "Naples": "https://media.api-sports.io/football/teams/492.png",
-  "AS Rome": "https://media.api-sports.io/football/teams/497.png"
+  "Olympique de Marseille": "https://media.api-sports.io/football/teams/81.png"
 };
 
-const AVATAR_COLORS = ['#e94560','#00b894','#6c5ce7','#f5c518','#0984e3','#e17055','#00cec9'];
+function getLogo(name) {
+  return LOGOS[name] || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=1a1a1c&color=fff&size=64&bold=true`;
+}
 
+// BDD LOCALE ROBUSTE (Remplacement de Firebase le temps de fixer les bugs)
 let appState = {
-  users: JSON.parse(localStorage.getItem('pf_local_users')) || [],
-  scores: JSON.parse(localStorage.getItem('pf_scores_v3')) || {},
-  groups: JSON.parse(localStorage.getItem('pf_groups_v3')) || [],
-  globalChat: JSON.parse(localStorage.getItem('pf_global_chat')) || [],
-  settings: {
-    themeColor: '#e94560',
-    playlist: JSON.parse(localStorage.getItem('pf_playlist')) || [
-      { name: "Ambiance Stade", src: "https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3" },
-      { name: "UEFA Champions Anthem", src: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" }
-    ]
-  }
+  users: JSON.parse(localStorage.getItem('pf_pro_users')) || [
+    { id: 'admin', username: 'Admin', email: 'admin@pronofoot.com', pass: 'admin123', role: 'admin', points: 0, preds: {} }
+  ],
+  scores: JSON.parse(localStorage.getItem('pf_pro_scores')) || {},
+  session: localStorage.getItem('pf_pro_session') || null
 };
 
-let currentUser = JSON.parse(localStorage.getItem('pf_cloud_session')) || null;
-let currentLeague = 'all';
-let currentMonth = ''; 
+let currentUser = null;
 
-// ============================
-// LECTEUR AUDIO & PLAYLIST
-// ============================
-let audioPlayer = null;
-let currentSongIndex = 0;
-let isMusicPlaying = false;
-let isShuffle = false;
-
-function setupAudioPlayer() {
-  audioPlayer = document.getElementById('siteAudioPlayer');
-  if (!audioPlayer) return;
-
-  audioPlayer.onended = () => { nextSong(); };
-  renderPlaylistUI();
-  loadSong(currentSongIndex);
+// ==========================================
+// FONCTIONS DE BASE
+// ==========================================
+function saveDB() {
+  localStorage.setItem('pf_pro_users', JSON.stringify(appState.users));
+  localStorage.setItem('pf_pro_scores', JSON.stringify(appState.scores));
 }
 
-function loadSong(index) {
-  if (appState.settings.playlist.length === 0) return;
-  if (index < 0) index = appState.settings.playlist.length - 1;
-  if (index >= appState.settings.playlist.length) index = 0;
-  
-  currentSongIndex = index;
-  const song = appState.settings.playlist[index];
-  
-  audioPlayer.src = song.src;
-  document.getElementById('musicTitleDisplay').textContent = song.name;
-  
-  document.querySelectorAll('.playlist-item').forEach((el, i) => {
-    el.classList.toggle('active', i === index);
-  });
-
-  if (isMusicPlaying) audioPlayer.play();
+function playSound(id) {
+  try { document.getElementById('snd-' + id).play(); } catch(e) {}
 }
 
-function toggleSiteMusic() {
-  if (appState.settings.playlist.length === 0) return;
-  const icon = document.getElementById('musicStatusIcon');
-  const btn = document.getElementById('musicPlayBtn');
-
-  if (isMusicPlaying) {
-    audioPlayer.pause();
-    isMusicPlaying = false;
-    icon.textContent = "🎵";
-    btn.textContent = "▶️";
-  } else {
-    audioPlayer.play().then(() => {
-      isMusicPlaying = true;
-      icon.textContent = "🔊";
-      btn.textContent = "⏸";
-    }).catch(() => { alert("Veuillez cliquer à nouveau pour autoriser l'audio."); });
-  }
-}
-
-function nextSong() {
-  if (appState.settings.playlist.length === 0) return;
-  let nextIdx = isShuffle ? Math.floor(Math.random() * appState.settings.playlist.length) : (currentSongIndex + 1);
-  loadSong(nextIdx);
-  if (isMusicPlaying) audioPlayer.play();
-}
-
-function prevSong() {
-  if (appState.settings.playlist.length === 0) return;
-  let prevIdx = currentSongIndex - 1;
-  loadSong(prevIdx);
-  if (isMusicPlaying) audioPlayer.play();
-}
-
-function toggleShuffle() {
-  isShuffle = !isShuffle;
-  document.getElementById('musicShuffleBtn').style.color = isShuffle ? 'var(--accent)' : 'var(--text-muted)';
-}
-
-function renderPlaylistUI() {
-  const container = document.getElementById('playlistContainer');
-  if (!container) return;
-  
-  let html = '';
-  appState.settings.playlist.forEach((song, i) => {
-    html += `<div class="playlist-item ${i===currentSongIndex?'active':''}" onclick="loadSong(${i});if(!isMusicPlaying)toggleSiteMusic();">🎵 ${song.name}</div>`;
-  });
-  container.innerHTML = html;
-}
-
-// ============================
-// COMPRESSION ET UPLOAD FICHIERS
-// ============================
-function compressAudioFile(file, callback) {
-  if (file.size > 10 * 1024 * 1024) { alert("Le fichier est trop grand (limite: 10 Mo)."); return; }
-  const reader = new FileReader();
-  reader.onload = function(e) { callback(e.target.result, file.name); };
-  reader.readAsDataURL(file);
-}
-
-function adminAddMusic(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  
-  document.getElementById('audioFileNameDisplay').textContent = "⏳ Chargement de " + file.name + "...";
-  
-  compressAudioFile(file, async function(dataUrl, name) {
-    const newSong = { name: name.replace('.mp3', ''), src: dataUrl };
-    appState.settings.playlist.push(newSong);
-    localStorage.setItem('pf_playlist', JSON.stringify(appState.settings.playlist));
-    
-    if (firestore) {
-      try { await firestore.collection('settings').doc('global').set({ playlist: appState.settings.playlist }, { merge: true }); } catch (e) {}
-    }
-    
-    setupAudioPlayer();
-    renderAdminPlaylist();
-    document.getElementById('audioFileNameDisplay').textContent = "✅ Morceau ajouté : " + newSong.name;
-  });
-}
-
-function renderAdminPlaylist() {
-  const cont = document.getElementById('adminPlaylistList');
-  if (!cont) return;
-  let html = '';
-  appState.settings.playlist.forEach((s, i) => {
-    html += `<div style="display:flex;justify-content:space-between;padding:4px;border-bottom:1px solid var(--border)">
-      <span>${s.name}</span>
-      <button class="btn btn-xs btn-secondary" onclick="adminRemoveSong(${i})">❌</button>
-    </div>`;
-  });
-  cont.innerHTML = html;
-}
-
-function adminRemoveSong(index) {
-  appState.settings.playlist.splice(index, 1);
-  localStorage.setItem('pf_playlist', JSON.stringify(appState.settings.playlist));
-  if (firestore) firestore.collection('settings').doc('global').set({ playlist: appState.settings.playlist }, { merge: true });
-  setupAudioPlayer();
-  renderAdminPlaylist();
-}
-
-// ============================
-// OUTILS (Oeil Mdp, Dates)
-// ============================
-function togglePassword(inputId) {
-  const input = document.getElementById(inputId);
-  if (input.type === "password") { input.type = "text"; } else { input.type = "password"; }
-}
-
-function forgotPassword() {
-  const email = prompt("Entrez votre adresse email pour recevoir un mot de passe temporaire :");
-  if (!email) return;
-  const user = appState.users.find(u => u.email.toLowerCase() === email.toLowerCase());
-  if (user) {
-    const tempPass = Math.random().toString(36).slice(-8);
-    alert(`✅ Par chance, vous êtes en mode Cloud Local !\n\nVotre mot de passe temporaire est : ${tempPass}\n\nNotez-le immédiatement, connectez-vous, puis mettez à jour votre compte.`);
-    user.pass = tempPass;
-    if (firestore) firestore.collection('users').doc(user.id).update({ pass: tempPass });
-  } else {
-    alert("❌ Aucune adresse email correspondante trouvée.");
-  }
-}
-
-// Générer automatiquement la barre des mois selon le mois actuel
-function setupMonthFilter() {
-  const d = new Date();
-  const m = (d.getMonth() + 1).toString().padStart(2, '0');
-  currentMonth = m; // Par défaut : le mois actuel !
-  
-  const bar = document.getElementById('monthFilterBar');
-  if (!bar) return;
-
-  const months = [
-    {val:'all', lbl:'Toute l\'année'}, {val:'08',lbl:'Août'}, {val:'09',lbl:'Septembre'}, {val:'10',lbl:'Octobre'},
-    {val:'11',lbl:'Novembre'}, {val:'12',lbl:'Décembre'}, {val:'01',lbl:'Janvier'}, {val:'02',lbl:'Février'},
-    {val:'03',lbl:'Mars'}, {val:'04',lbl:'Avril'}, {val:'05',lbl:'Mai'}
-  ];
-  
-  let html = '';
-  months.forEach(mo => {
-    const isAct = mo.val === currentMonth;
-    html += `<button class="matchday-pill ${isAct?'active':''}" onclick="filterByMonth('${mo.val}')">${mo.lbl}</button>`;
-  });
-  bar.innerHTML = html;
-}
-
-// ============================
-// NOYAU PRINCIPAL
-// ============================
 function init() {
-  setupAudioPlayer();
-  setupMonthFilter();
+  if (appState.session) {
+    currentUser = appState.users.find(u => u.id === appState.session);
+  }
   
   if (currentUser) {
     document.getElementById('authScreen').style.display = 'none';
+    document.getElementById('appContainer').style.display = 'block';
     setupApp();
   } else {
     document.getElementById('authScreen').style.display = 'flex';
+    document.getElementById('appContainer').style.display = 'none';
   }
+}
+
+// ==========================================
+// AUTHENTIFICATION CORRIGÉE (RÉPARÉE !)
+// ==========================================
+function switchAuth(tab) {
+  document.getElementById('authError').style.display = 'none';
+  if (tab === 'login') {
+    document.getElementById('tabLogin').style.background = 'var(--accent)';
+    document.getElementById('tabLogin').style.color = '#000';
+    document.getElementById('tabReg').style.background = '#2c2c2e';
+    document.getElementById('tabReg').style.color = 'var(--text-main)';
+    document.getElementById('loginForm').style.display = 'block';
+    document.getElementById('registerForm').style.display = 'none';
+  } else {
+    document.getElementById('tabReg').style.background = 'var(--accent)';
+    document.getElementById('tabReg').style.color = '#000';
+    document.getElementById('tabLogin').style.background = '#2c2c2e';
+    document.getElementById('tabLogin').style.color = 'var(--text-main)';
+    document.getElementById('loginForm').style.display = 'none';
+    document.getElementById('registerForm').style.display = 'block';
+  }
+}
+// Mettre le bouton login en couleur active par défaut
+switchAuth('login');
+
+function handleLogin(e) {
+  e.preventDefault();
+  const em = document.getElementById('loginEmail').value.trim().toLowerCase();
+  const pass = document.getElementById('loginPass').value;
+  
+  const found = appState.users.find(u => u.email.toLowerCase() === em && u.pass === pass);
+  
+  if (!found) {
+    document.getElementById('authError').textContent = "Email ou mot de passe incorrect.";
+    document.getElementById('authError').style.display = "block";
+    return;
+  }
+  
+  currentUser = found;
+  localStorage.setItem('pf_pro_session', found.id);
+  document.getElementById('authScreen').style.display = 'none';
+  document.getElementById('appContainer').style.display = 'block';
+  setupApp();
+}
+
+function handleRegister(e) {
+  e.preventDefault();
+  const un = document.getElementById('regUser').value.trim();
+  const em = document.getElementById('regEmail').value.trim().toLowerCase();
+  const pass = document.getElementById('regPass').value;
+  
+  if (appState.users.find(u => u.email.toLowerCase() === em)) {
+    document.getElementById('authError').textContent = "Cet email est déjà utilisé.";
+    document.getElementById('authError').style.display = "block";
+    return;
+  }
+  
+  const newUser = { id: 'u_'+Date.now(), username: un, email: em, pass: pass, role: 'user', points: 0, preds: {} };
+  appState.users.push(newUser);
+  saveDB();
+  
+  currentUser = newUser;
+  localStorage.setItem('pf_pro_session', newUser.id);
+  document.getElementById('authScreen').style.display = 'none';
+  document.getElementById('appContainer').style.display = 'block';
+  setupApp();
+}
+
+function quickAdminLogin() {
+  currentUser = appState.users.find(u => u.role === 'admin');
+  localStorage.setItem('pf_pro_session', currentUser.id);
+  document.getElementById('authScreen').style.display = 'none';
+  document.getElementById('appContainer').style.display = 'block';
+  setupApp();
+}
+
+// ==========================================
+// NAVIGATION & AFFICHAGE
+// ==========================================
+function navigateTo(page) {
+  document.querySelectorAll('.page-section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.bottom-nav-item').forEach(b => b.classList.remove('active'));
+  
+  document.getElementById('page-' + page).classList.add('active');
+  const btn = document.querySelector(`.bottom-nav-item[onclick*="${page}"]`);
+  if (btn) btn.classList.add('active');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function setupApp() {
-  updateUI();
-  renderMatches();
-  renderLeaderboard();
-  
-  if (currentUser && currentUser.role === 'admin') {
-    document.getElementById('adminNavBtn').style.display = 'flex';
-    document.getElementById('topAdminBtn').style.display = 'block';
-    renderAdminPlaylist();
+  if (currentUser.role === 'admin') {
+    document.getElementById('adminBtn').style.display = 'flex';
   }
+  
+  document.getElementById('navPoints').textContent = currentUser.points + ' pts';
+  document.getElementById('navAvatar').textContent = currentUser.username[0].toUpperCase();
+  document.getElementById('welcomeMsg').textContent = `Salut, ${currentUser.username} ! 👋`;
+  
+  document.getElementById('statPoints').textContent = currentUser.points;
+  document.getElementById('statPreds').textContent = Object.keys(currentUser.preds || {}).length;
+  
+  renderMatches();
+  if (currentUser.role === 'admin') renderAdminMatches();
 }
 
-function filterByMonth(m) {
-  currentMonth = m;
-  document.querySelectorAll('#monthFilterBar .matchday-pill').forEach(b => b.classList.remove('active'));
-  if (event && event.target) event.target.classList.add('active');
-  renderMatches();
+// ==========================================
+// MATCHS & COTES (GADGET)
+// ==========================================
+// Générer de fausses cotes réalistes basées sur un calcul mathématique simple
+function generateOdds(home, away) {
+  const h = (Math.random() * 2 + 1.1).toFixed(2);
+  const a = (Math.random() * 3 + 2.5).toFixed(2);
+  const d = (Math.random() * 1.5 + 3.0).toFixed(2);
+  return { h, d, a };
 }
 
 function renderMatches() {
   const container = document.getElementById('matchesContainer');
-  let list = ALL_MATCHES;
-
-  if (currentLeague !== 'all') list = list.filter(m => m.league === currentLeague);
-  if (currentMonth !== 'all') {
-    list = list.filter(m => {
-      const parts = m.date.split('-');
-      // Format 2026-08-21
-      if (parts.length === 3) return parts[1] === currentMonth;
-      // Format 21/08/2026
-      const partsSlash = m.date.split('/');
-      if (partsSlash.length === 3) return partsSlash[1] === currentMonth;
-      return true;
-    });
-  }
-
-  if (list.length === 0) {
-    container.innerHTML = '<p style="text-align:center;color:var(--text-muted);padding:40px">Aucun match trouvé pour ce mois ou cette ligue.</p>';
-    return;
-  }
-
   let html = '';
-  list.forEach(m => {
-    const pred = (currentUser && currentUser.preds && currentUser.preds[m.id]) || { h:'', a:'' };
+  
+  ALL_MATCHES.forEach(m => {
+    const pred = currentUser.preds[m.id] || { h:'', a:'' };
+    const score = appState.scores[m.id];
+    const odds = generateOdds(m.home, m.away);
+    
+    let resultOverlay = '';
+    if (score) {
+      let pts = 0;
+      if (pred.h !== '' && pred.a !== '') {
+        if (pred.h === score.h && pred.a === score.a) pts = 5;
+        else if ((pred.h>pred.a && score.h>score.a) || (pred.h<pred.a && score.h<score.a) || (pred.h===pred.a && score.h===score.a)) pts = 3;
+      }
+      
+      const col = pts === 5 ? 'var(--gold)' : pts === 3 ? 'var(--accent)' : 'var(--text-muted)';
+      const txt = pts === 5 ? 'SCORE EXACT +5' : pts === 3 ? 'BON RÉSULTAT +3' : 'PERDU 0';
+      
+      resultOverlay = `
+        <div style="margin-top:15px;padding:10px;border-radius:8px;background:#111;text-align:center;font-weight:900;color:${col}">
+          FIN : ${score.h} - ${score.a} <br> <span style="font-size:0.75rem">${txt}</span>
+        </div>`;
+    }
+
     html += `
       <div class="match-card">
-        <div class="match-header"><span><strong>${m.league.toUpperCase()}</strong></span><span style="color:var(--gold)">📅 ${m.date}</span></div>
+        <div class="match-header">
+          <span>${m.league}</span>
+          <span>${m.date}</span>
+        </div>
         <div class="match-teams">
-          <div class="match-team home">${m.home}</div><div class="match-vs">VS</div><div class="match-team away">${m.away}</div>
+          <div class="team-name home"><span>${m.home}</span> <img src="${getLogo(m.home)}" class="team-logo"></div>
+          <div class="match-inputs">
+            <input type="number" id="h_${m.id}" value="${pred.h}" ${score?'disabled':''}>
+            <span style="font-weight:900;color:var(--text-muted)">-</span>
+            <input type="number" id="a_${m.id}" value="${pred.a}" ${score?'disabled':''}>
+          </div>
+          <div class="team-name away"><img src="${getLogo(m.away)}" class="team-logo"> <span>${m.away}</span></div>
         </div>
-        <div class="match-prediction">
-          <input type="number" min="0" max="15" value="${pred.h}" id="h_${m.id}" placeholder="-"><span>:</span>
-          <input type="number" min="0" max="15" value="${pred.a}" id="a_${m.id}" placeholder="-">
-        </div>
+        ${!score ? `
+        <div class="odds-container">
+          <div class="odd-box">1 <span>${odds.h}</span></div>
+          <div class="odd-box">N <span>${odds.d}</span></div>
+          <div class="odd-box">2 <span>${odds.a}</span></div>
+        </div>` : ''}
+        ${resultOverlay}
+      </div>`;
+  });
+  
+  container.innerHTML = html;
+}
+
+function saveAll() {
+  playSound('success');
+  let count = 0;
+  ALL_MATCHES.forEach(m => {
+    const h = document.getElementById('h_' + m.id)?.value;
+    const a = document.getElementById('a_' + m.id)?.value;
+    if (h !== '' && a !== '') {
+      currentUser.preds[m.id] = { h: parseInt(h), a: parseInt(a) };
+      count++;
+    }
+  });
+  
+  const idx = appState.users.findIndex(u => u.id === currentUser.id);
+  appState.users[idx] = currentUser;
+  saveDB();
+  setupApp();
+  
+  // Petit effet visuel
+  const btn = document.querySelector('button[onclick="saveAll()"]');
+  btn.textContent = "✅ " + count + " Enregistrés";
+  btn.style.background = "var(--gold)";
+  setTimeout(() => { btn.textContent = "Valider 💾"; btn.style.background = "var(--accent)"; }, 2000);
+}
+
+// ==========================================
+// ADMIN (SCORES ET CALCUL)
+// ==========================================
+function renderAdminMatches() {
+  const container = document.getElementById('adminMatchList');
+  let html = '';
+  ALL_MATCHES.forEach(m => {
+    const s = appState.scores[m.id];
+    html += `
+      <div style="display:flex;align-items:center;gap:10px;padding:10px;border-bottom:1px solid var(--border)">
+        <div style="flex:1;font-size:0.85rem"><strong>${m.home}</strong> vs <strong>${m.away}</strong></div>
+        <input type="number" id="adm_h_${m.id}" value="${s?s.h:''}" style="width:40px;padding:5px;background:#111;color:white;border:1px solid var(--border);border-radius:4px;text-align:center">
+        <input type="number" id="adm_a_${m.id}" value="${s?s.a:''}" style="width:40px;padding:5px;background:#111;color:white;border:1px solid var(--border);border-radius:4px;text-align:center">
+        <button class="btn btn-primary btn-xs" onclick="saveScore('${m.id}')">OK</button>
       </div>`;
   });
   container.innerHTML = html;
+}
+
+function saveScore(id) {
+  const h = parseInt(document.getElementById('adm_h_' + id).value);
+  const a = parseInt(document.getElementById('adm_a_' + id).value);
+  if (!isNaN(h) && !isNaN(a)) {
+    appState.scores[id] = { h, a };
+    recalcPoints();
+    saveDB();
+    setupApp();
+    alert('Score enregistré ! Points mis à jour.');
+  }
+}
+
+function simulateScores() {
+  ALL_MATCHES.slice(0,5).forEach(m => {
+    if (!appState.scores[m.id]) appState.scores[m.id] = { h: Math.floor(Math.random()*4), a: Math.floor(Math.random()*3) };
+  });
+  recalcPoints();
+  saveDB();
+  setupApp();
+}
+
+function resetScores() {
+  appState.scores = {};
+  recalcPoints();
+  saveDB();
+  setupApp();
+}
+
+function recalcPoints() {
+  appState.users.forEach(u => {
+    let t = 0;
+    for (const [id, p] of Object.entries(u.preds)) {
+      const s = appState.scores[id];
+      if (s) {
+        if (p.h === s.h && p.a === s.a) t += 5;
+        else if ((p.h>p.a && s.h>s.a) || (p.h<p.a && s.h<s.a) || (p.h===p.a && s.h===s.a)) t += 3;
+      }
+    }
+    u.points = t;
+  });
 }
 
 window.onload = init;
