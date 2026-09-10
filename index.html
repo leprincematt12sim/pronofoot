@@ -11,8 +11,8 @@
 </head>
 <body>
 
-  <!-- ELEMENT AUDIO CACHÉ DU SITE -->
-  <audio id="siteAudioPlayer" loop></audio>
+  <!-- LECTEUR AUDIO CACHÉ -->
+  <audio id="siteAudioPlayer"></audio>
 
   <!-- CONNEXION / INSCRIPTION -->
   <div class="auth-overlay" id="authScreen" style="display:none">
@@ -31,14 +31,25 @@
 
       <form id="loginForm" onsubmit="handleLogin(event)">
         <div class="form-group"><label>📧 Adresse Email</label><input type="email" id="loginEmail" placeholder="ton@email.com" required></div>
-        <div class="form-group"><label>🔒 Mot de passe</label><input type="password" id="loginPass" placeholder="••••••••" required></div>
+        <div class="form-group">
+          <label>🔒 Mot de passe</label>
+          <input type="password" id="loginPass" placeholder="••••••••" required>
+          <span class="password-toggle" onclick="togglePassword('loginPass')">👁️</span>
+        </div>
         <button type="submit" class="btn btn-primary" style="width:100%;margin-top:10px" id="loginBtn">Se connecter →</button>
+        <div style="text-align:center;margin-top:15px">
+          <a style="color:var(--gold);font-size:0.8rem;cursor:pointer;text-decoration:underline" onclick="forgotPassword()">Mot de passe oublié ?</a>
+        </div>
       </form>
 
       <form id="registerForm" style="display:none" onsubmit="handleRegister(event)">
         <div class="form-group"><label>👤 Pseudo de joueur</label><input type="text" id="regUser" placeholder="Ex: Mathis_92" required minlength="3"></div>
         <div class="form-group"><label>📧 Adresse Email</label><input type="email" id="regEmail" placeholder="ton@email.com" required></div>
-        <div class="form-group"><label>🔒 Mot de passe</label><input type="password" id="regPass" placeholder="Min. 6 caractères" required minlength="6"></div>
+        <div class="form-group">
+          <label>🔒 Mot de passe</label>
+          <input type="password" id="regPass" placeholder="Min. 6 caractères" required minlength="6">
+          <span class="password-toggle" onclick="togglePassword('regPass')">👁️</span>
+        </div>
         <button type="submit" class="btn btn-primary" style="width:100%;margin-top:10px" id="registerBtn">Créer mon compte →</button>
       </form>
     </div>
@@ -49,10 +60,24 @@
     <nav class="top-nav">
       <div class="nav-brand" onclick="navigateTo('dashboard')">⚽ PronoFoot</div>
       
-      <!-- WIDGET MUSIQUE DANS LA BARRE DU HAUT -->
-      <div class="music-widget" onclick="toggleSiteMusic()" title="Cliquer pour jouer / mettre en pause la musique">
-        <span id="musicStatusIcon">🎵</span>
-        <span class="music-title" id="musicTitleDisplay">Musique Off</span>
+      <!-- WIDGET MUSIQUE AMÉLIORÉ (PLAYLIST DÉROULANTE) -->
+      <div class="music-widget">
+        <div style="display:flex;align-items:center;gap:6px" onclick="toggleSiteMusic()">
+          <span id="musicStatusIcon">🎵</span>
+          <span class="music-title" id="musicTitleDisplay">Musique Off</span>
+        </div>
+        
+        <div class="music-panel" id="musicPlaylistPanel">
+          <div class="music-controls">
+            <button class="music-btn" onclick="prevSong()" title="Précédent">⏮</button>
+            <button class="music-btn" onclick="toggleSiteMusic()" id="musicPlayBtn" title="Play/Pause">▶️</button>
+            <button class="music-btn" onclick="nextSong()" title="Suivant">⏭</button>
+            <button class="music-btn" onclick="toggleShuffle()" id="musicShuffleBtn" title="Aléatoire" style="font-size:1rem;color:var(--text-muted)">🔀</button>
+          </div>
+          <div id="playlistContainer" style="max-height:100px;overflow-y:auto;display:flex;flex-direction:column;gap:2px">
+            <!-- Playlist Items Auto -->
+          </div>
+        </div>
       </div>
 
       <div class="nav-user">
@@ -62,32 +87,21 @@
       </div>
     </nav>
 
-    <!-- NAVBAR DU BAS -->
     <nav class="bottom-nav">
       <button class="bottom-nav-item active" onclick="navigateTo('dashboard')"><span>🏠</span><span>Accueil</span></button>
       <button class="bottom-nav-item" onclick="navigateTo('matches')"><span>⚽</span><span>Matchs</span></button>
       <button class="bottom-nav-item" onclick="navigateTo('leaderboard')"><span>🏆</span><span>Général</span></button>
       <button class="bottom-nav-item" onclick="navigateTo('groups')"><span>👥</span><span>Groupes</span></button>
       <button class="bottom-nav-item" onclick="navigateTo('chat')"><span>💬</span><span>Chat</span></button>
-      <button class="bottom-nav-item" onclick="navigateTo('admin')" id="adminNavBtn" style="display:none"><span>⚙️</span><span>Admin</span></button>
     </nav>
 
     <div class="main-content">
 
-      <!-- 1. DASHBOARD -->
+      <!-- DASHBOARD -->
       <div class="page-section active" id="page-dashboard">
         <div class="welcome-banner">
           <h2 id="welcomeMsg">Bienvenue ! 👋</h2>
-          <p>Pronostique les matchs de la saison 2026-27 et grimpe au sommet !</p>
-        </div>
-
-        <div id="kingBannerBox" class="king-banner">
-          <div style="font-size:2.5rem">👑</div>
-          <div>
-            <div style="font-size:0.75rem;color:var(--gold);font-weight:bold;text-transform:uppercase">Leader Actuel du Classement</div>
-            <div id="kingUsername" style="font-size:1.1rem;font-weight:900">-</div>
-            <div id="kingPoints" style="font-size:0.85rem;color:var(--text-muted)">- pts</div>
-          </div>
+          <p>Pronostique les matchs du mois en cours et sois le roi !</p>
         </div>
 
         <div id="announcementBox" style="display:none;background:var(--bg-card);border:1px solid var(--gold);padding:12px 16px;border-radius:var(--radius-sm);margin-bottom:20px;color:var(--gold)">
@@ -110,16 +124,16 @@
           </button>
         </div>
 
-        <h3 style="margin-bottom:12px">🏆 Top 5 Général (Saison 2026-27)</h3>
+        <h3 style="margin-bottom:12px">🏆 Top 5 Général</h3>
         <div id="dashboardLeaderboard" style="margin-bottom:20px"></div>
       </div>
 
-      <!-- 2. MATCHS -->
+      <!-- MATCHS (FILTRE SUR LE MOIS EN COURS PAR DÉFAUT) -->
       <div class="page-section" id="page-matches">
         <div id="leagueBannerArea"></div>
 
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:10px">
-          <h3 id="matchesSectionTitle" class="league-title-special">⚽ Calendrier 2026-27</h3>
+          <h3 id="matchesSectionTitle" class="league-title-special">⚽ Matchs du Mois</h3>
           <button class="btn btn-primary btn-sm" onclick="saveAll()">💾 Sauvegarder Pronos</button>
         </div>
 
@@ -134,111 +148,59 @@
         </div>
 
         <div class="matchday-bar" id="monthFilterBar">
-          <button class="matchday-pill active" onclick="filterByMonth('all')">📅 Tous les mois</button>
-          <button class="matchday-pill" onclick="filterByMonth('08')">Août 2026</button>
-          <button class="matchday-pill" onclick="filterByMonth('09')">Septembre 2026</button>
-          <button class="matchday-pill" onclick="filterByMonth('10')">Octobre 2026</button>
-          <button class="matchday-pill" onclick="filterByMonth('11')">Novembre 2026</button>
-          <button class="matchday-pill" onclick="filterByMonth('12')">Décembre 2026</button>
-          <button class="matchday-pill" onclick="filterByMonth('01')">Janvier 2027</button>
-          <button class="matchday-pill" onclick="filterByMonth('02')">Février 2027</button>
-          <button class="matchday-pill" onclick="filterByMonth('03')">Mars 2027</button>
-          <button class="matchday-pill" onclick="filterByMonth('04')">Avril 2027</button>
-          <button class="matchday-pill" onclick="filterByMonth('05')">Mai 2027</button>
+          <!-- Ce menu sera rempli automatiquement par le script JavaScript -->
         </div>
 
         <div id="matchesContainer"></div>
       </div>
 
-      <!-- 3. CLASSEMENT GLOBAL -->
+      <!-- CLASSEMENT -->
       <div class="page-section" id="page-leaderboard">
         <h3 style="margin-bottom:5px" class="league-title-special">🏆 Classement Général Cloud</h3>
-        <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:20px">Synchronisation instantanée dès qu'un score est validé.</p>
         <div id="podiumContainer" style="margin-bottom:25px"></div>
         <div id="leaderboardContainer"></div>
       </div>
 
-      <!-- 4. GROUPES PRIVÉS -->
+      <!-- GROUPES -->
       <div class="page-section" id="page-groups">
-        <h3 style="margin-bottom:5px" class="league-title-special">👥 Mes Groupes Privés & Ligas Fermées</h3>
-        <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:20px">Créez votre ligue privée ou rejoignez vos amis avec leur code !</p>
-
+        <h3 style="margin-bottom:5px" class="league-title-special">👥 Groupes Privés</h3>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
-          <button class="btn btn-primary" onclick="showCreateGroupPrompt()">➕ Créer un Groupe Privé</button>
-          <button class="btn btn-gold" onclick="showJoinGroupPrompt()">🔑 Rejoindre avec un Code</button>
+          <button class="btn btn-primary" onclick="showCreateGroupPrompt()">➕ Créer un Groupe</button>
+          <button class="btn btn-gold" onclick="showJoinGroupPrompt()">🔑 Rejoindre (Code)</button>
         </div>
-
         <div id="groupsListContainer"></div>
-
         <div id="groupChatSection" style="display:none;margin-top:25px">
-          <h4 style="color:var(--gold);margin-bottom:8px">💬 Chat Privé du Groupe (<span id="chatGroupName"></span>)</h4>
+          <h4 style="color:var(--gold);margin-bottom:8px">💬 Chat du Groupe (<span id="chatGroupName"></span>)</h4>
           <div class="chat-box" id="chatMessagesBox"></div>
           <form onsubmit="handleSendChatMessage(event)" style="display:flex;gap:8px">
-            <input type="text" id="chatInputText" placeholder="Message au groupe..." style="flex:1;padding:10px;background:var(--bg-dark);border:1px solid var(--border);border-radius:6px;color:white" required>
+            <input type="text" id="chatInputText" placeholder="Message..." style="flex:1;padding:10px;background:var(--bg-dark);border:1px solid var(--border);border-radius:6px;color:white" required>
             <button type="submit" class="btn btn-primary btn-sm">Envoyer 🚀</button>
           </form>
         </div>
       </div>
 
-      <!-- 5. CHAT GÉNÉRAL -->
+      <!-- CHAT GENERAL -->
       <div class="page-section" id="page-chat">
         <h3 class="league-title-special" style="margin-bottom:5px">💬 Le Salon des Supporters</h3>
-        <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:15px">Discutez en direct avec tous les joueurs de la communauté !</p>
-
         <div class="chat-container">
-          <div class="chat-box" id="globalChatMessagesBox">
-            <p style="text-align:center;color:var(--text-muted);font-size:0.85rem">Chargement des messages...</p>
-          </div>
-
+          <div class="chat-box" id="globalChatMessagesBox"></div>
           <form onsubmit="handleSendGlobalChatMessage(event)" style="display:flex;gap:8px">
-            <input type="text" id="globalChatInput" placeholder="Écris ton message à tous les supporters..." style="flex:1;padding:12px;background:var(--bg-dark);border:1px solid var(--border);border-radius:8px;color:white" required>
-            <button type="submit" class="btn btn-primary">Envoyer 🚀</button>
+            <input type="text" id="globalChatInput" placeholder="Message public..." style="flex:1;padding:12px;background:var(--bg-dark);border:1px solid var(--border);border-radius:8px;color:white" required>
+            <button type="submit" class="btn btn-primary">Envoyer</button>
           </form>
-        </div>
-
-        <div class="poll-card">
-          <h4 style="color:var(--gold);margin-bottom:8px">📊 Sondage de la Communauté</h4>
-          <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:12px">Qui va remporter la Ligue des Champions 2026-27 ?</p>
-          
-          <div class="poll-option" onclick="votePoll('real')">
-            <div class="poll-bar" id="bar_real" style="width:45%"></div>
-            <span style="position:relative">👑 Real Madrid</span>
-            <span style="position:relative" id="count_real">45%</span>
-          </div>
-          <div class="poll-option" onclick="votePoll('psg')">
-            <div class="poll-bar" id="bar_psg" style="width:30%"></div>
-            <span style="position:relative">🔴🔵 Paris SG</span>
-            <span style="position:relative" id="count_psg">30%</span>
-          </div>
-          <div class="poll-option" onclick="votePoll('mancity')">
-            <div class="poll-bar" id="bar_mancity" style="width:25%"></div>
-            <span style="position:relative">🩵 Manchester City</span>
-            <span style="position:relative" id="count_mancity">25%</span>
-          </div>
         </div>
       </div>
 
-      <!-- 6. BONUS -->
+      <!-- BONUS -->
       <div class="page-section" id="page-bonuses">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px">
-          <div><h3 class="league-title-special">🎯 Bonus de Fin de Saison</h3><p style="font-size:0.85rem;color:var(--text-muted)">Pronostique les vainqueurs finaux !</p></div>
+          <div><h3 class="league-title-special">🎯 Bonus de Saison</h3></div>
           <button class="btn btn-gold btn-sm" onclick="saveBonuses()">💾 Sauvegarder</button>
         </div>
         <div id="bonusesContainer" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:15px"></div>
       </div>
 
-      <!-- 7. RÈGLES -->
-      <div class="page-section" id="page-rules">
-        <h3 style="margin-bottom:15px" class="league-title-special">📜 Règles Officielles</h3>
-        <div class="rules-box">
-          <h3>🎮 Système de Points</h3>
-          <div class="rules-highlight"><strong>🎯 Score Exact = 5 Points</strong></div>
-          <div class="rules-highlight"><strong>✅ Bon Vainqueur / Nul = 3 Points</strong></div>
-          <div class="rules-highlight"><strong>❌ Mauvais Résultat = 0 Point</strong></div>
-        </div>
-      </div>
-
-      <!-- 8. PROFIL -->
+      <!-- PROFIL -->
       <div class="page-section" id="page-profile">
         <h3 style="margin-bottom:15px" class="league-title-special">👤 Mon Profil</h3>
         <div class="admin-card" style="text-align:center;max-width:400px;margin:0 auto">
@@ -249,101 +211,36 @@
             </div>
             <input type="file" accept="image/*" style="display:none" onchange="uploadUserAvatar(event)">
           </label>
-
           <h2 id="profileUsername">-</h2>
-          <p id="profileEmail" style="color:var(--text-muted);font-size:0.85rem;margin-bottom:8px">-</p>
-          <p id="profileRole" style="color:var(--gold);font-size:0.85rem;font-weight:bold;margin-bottom:20px"></p>
-
-          <button class="btn btn-whatsapp" style="width:100%;margin-bottom:10px" onclick="shareChallengeWhatsApp()">
-            📲 Partager mes stats sur WhatsApp
-          </button>
+          <p id="profileEmail" style="color:var(--text-muted);font-size:0.85rem;margin-bottom:20px">-</p>
           <button class="btn btn-secondary" style="width:100%" onclick="handleLogout()">🚪 Se Déconnecter</button>
         </div>
       </div>
 
-      <!-- 9. ADMIN (AVEC CHARGEMENT DE FICHIER MP3 DEPUIS PC) -->
+      <!-- ADMIN -->
       <div class="page-section" id="page-admin">
         <h3 class="league-title-special" style="margin-bottom:15px">⚙️ Panneau Administrateur</h3>
-
-        <!-- BLOC GESTION MUSIQUE MP3 DU SITE -->
+        
         <div class="admin-card" style="border:2px solid var(--gold)">
-          <h4 style="color:var(--gold)">🎵 Musique de Fond du Site (Fichier MP3)</h4>
-          <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:12px">
-            Chargez un morceau MP3 depuis votre ordinateur pour que vos joueurs puissent l'écouter en naviguant sur le site :
-          </p>
-
+          <h4 style="color:var(--gold)">🎵 Playlist Musicale du Site</h4>
+          <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:10px">Ajoutez des fichiers MP3 depuis votre ordinateur pour créer la playlist du site :</p>
           <div class="form-group">
-            <label style="background:var(--accent);color:white;padding:12px;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-size:0.85rem;font-weight:bold;width:100%;justify-content:center">
-              🎵 Choisir un fichier MP3 sur mon PC
-              <input type="file" accept="audio/mp3,audio/*" style="display:none" onchange="uploadAudioFromFile(event)">
+            <label style="background:var(--gold);color:#0a0a1a;padding:12px;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-size:0.85rem;font-weight:bold;width:100%;justify-content:center">
+              ➕ Ajouter une musique MP3
+              <input type="file" accept="audio/mp3,audio/*" style="display:none" onchange="adminAddMusic(event)">
             </label>
           </div>
-          <p id="audioFileNameDisplay" style="font-size:0.8rem;color:var(--green);font-weight:bold"></p>
-        </div>
-
-        <div class="admin-card" style="border:2px solid var(--gold)">
-          <h4 style="color:var(--gold)">⚡ Synchronization Automatique API Sports</h4>
-          <div class="form-group" style="margin-bottom:10px">
-            <input type="text" id="adminApiKeyInput" placeholder="Clé API-Sports..." style="font-family:monospace">
-          </div>
-          <button class="btn btn-gold btn-sm" onclick="saveAndSyncApiSports()">⚡ Synchro Vrais Scores</button>
-          <p id="apiSyncStatus" style="font-size:0.8rem;margin-top:8px;color:var(--green);font-weight:bold"></p>
+          <div id="adminPlaylistList" style="margin-top:10px;font-size:0.8rem;max-height:120px;overflow-y:auto;background:var(--bg-dark);border-radius:6px;padding:6px"></div>
         </div>
 
         <div class="admin-grid">
           <div class="admin-card" style="grid-column:1/-1">
-            <h4>⚽ Saisie des Scores (Cloud)</h4>
-            <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-              <button class="btn btn-primary btn-sm" onclick="adminSimulateScores()">🎲 Simuler 10 scores</button>
-              <button class="btn btn-gold btn-sm" onclick="adminSimulateAll()">🎲 Simuler TOUT</button>
-              <button class="btn btn-secondary btn-sm" onclick="adminResetScores()">🗑️ Réinitialiser scores</button>
-            </div>
+            <h4>⚽ Saisie des Scores</h4>
             <div id="adminMatchList" style="max-height:420px;overflow-y:auto"></div>
-          </div>
-
-          <div class="admin-card" style="grid-column:1/-1">
-            <h4>🖼️ Arrière-plans par Championnat</h4>
-            <div id="adminLeagueBackgrounds"></div>
-          </div>
-
-          <div class="admin-card" style="grid-column:1/-1">
-            <h4>🏟️ Bannières par Championnat</h4>
-            <div id="adminLeagueBanners"></div>
-          </div>
-
-          <div class="admin-card">
-            <h4>🎨 Couleur du Thème</h4>
-            <div class="theme-colors">
-              <div class="theme-dot active" style="background:#e94560" onclick="changeTheme('#e94560')"></div>
-              <div class="theme-dot" style="background:#00b894" onclick="changeTheme('#00b894')"></div>
-              <div class="theme-dot" style="background:#6c5ce7" onclick="changeTheme('#6c5ce7')"></div>
-              <div class="theme-dot" style="background:#f5c518" onclick="changeTheme('#f5c518')"></div>
-              <div class="theme-dot" style="background:#0984e3" onclick="changeTheme('#0984e3')"></div>
-            </div>
-          </div>
-
-          <div class="admin-card">
-            <h4>📢 Annonce</h4>
-            <div class="form-group"><input type="text" id="adminAnnounceInput" placeholder="Message général..."></div>
-            <button class="btn btn-gold btn-sm" style="width:100%" onclick="adminPublishAnnouncement()">Publier</button>
-          </div>
-
-          <div class="admin-card">
-            <h4>📊 Statistiques Cloud</h4>
-            <div id="adminStats"></div>
           </div>
         </div>
       </div>
 
-    </div>
-
-    <div class="site-footer">
-      <p>⚽ PronoFoot — Compétition Européenne 2026-27</p>
-      <p style="margin-top:6px">
-        <a onclick="navigateTo('rules')">📜 Règles</a> · 
-        <a onclick="navigateTo('chat')">💬 Chat Général</a> · 
-        <a onclick="quickAdminLogin()" style="color:var(--gold)">⭐ Espace Admin</a>
-      </p>
     </div>
   </div>
 
