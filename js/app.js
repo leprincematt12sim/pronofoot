@@ -11,7 +11,7 @@ let firestore = null;
 try {
   if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
   firestore = firebase.firestore();
-} catch (e) {}
+} catch (e) { console.warn("Firebase Init Error"); }
 
 const REAL_API_KEY = "5eb745d2e42b3f1e72fddff81191592e";
 
@@ -52,10 +52,13 @@ let appState = {
   users: JSON.parse(localStorage.getItem('pf_local_users')) || [],
   scores: JSON.parse(localStorage.getItem('pf_scores_v3')) || {},
   groups: JSON.parse(localStorage.getItem('pf_groups_v3')) || [],
+  globalChat: JSON.parse(localStorage.getItem('pf_global_chat')) || [],
   settings: {
     bgImage: 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=1920&q=80',
     authBgImage: '',
+    dashboardBgImage: '',
     themeColor: '#00E676',
+    apiKey: REAL_API_KEY,
     playlist: JSON.parse(localStorage.getItem('pf_playlist')) || [
       { name: "Ambiance Stade", src: "https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3" }
     ]
@@ -74,6 +77,7 @@ function getTeamCrest(name) { return TEAM_CRESTS[name] || `https://ui-avatars.co
 let audioPlayer = null;
 let currentSongIndex = 0;
 let isMusicPlaying = false;
+let isShuffle = false;
 
 function setupAudioPlayer() {
   audioPlayer = document.getElementById('siteAudioPlayer');
@@ -94,19 +98,23 @@ function loadSong(index) {
 function toggleSiteMusic() {
   if (!appState.settings.playlist || appState.settings.playlist.length === 0) return;
   const icon = document.getElementById('musicStatusIcon');
-  if (isMusicPlaying) { audioPlayer.pause(); isMusicPlaying = false; icon.textContent = "🎵"; }
-  else { audioPlayer.play().then(() => { isMusicPlaying = true; icon.textContent = "🔊"; }).catch(()=>{}); }
+  const btn = document.getElementById('musicPlayBtn');
+  if (isMusicPlaying) { audioPlayer.pause(); isMusicPlaying = false; icon.textContent = "🎵"; if (btn) btn.textContent = "▶️"; }
+  else { audioPlayer.play().then(() => { isMusicPlaying = true; icon.textContent = "🔊"; if (btn) btn.textContent = "⏸"; }).catch(()=>{}); }
 }
-function nextSong() { loadSong(currentSongIndex + 1); }
-function prevSong() { loadSong(currentSongIndex - 1); }
+function nextSong() { let n = isShuffle ? Math.floor(Math.random() * appState.settings.playlist.length) : (currentSongIndex + 1); loadSong(n); if(isMusicPlaying)audioPlayer.play(); }
+function prevSong() { loadSong(currentSongIndex - 1); if(isMusicPlaying)audioPlayer.play(); }
+function toggleShuffle() { isShuffle = !isShuffle; const b = document.getElementById('musicShuffleBtn'); if(b) b.style.color = isShuffle?'var(--accent)':'var(--text-muted)'; }
 function renderPlaylistUI() {
   const container = document.getElementById('playlistContainer');
   if (!container || !appState.settings.playlist) return;
   container.innerHTML = appState.settings.playlist.map((song, i) => `<div class="playlist-item" onclick="loadSong(${i});if(!isMusicPlaying)toggleSiteMusic();">🎵 ${song.name}</div>`).join('');
 }
+
+// UPLOAD AUDIO (COMPRESSÉ < 8Mo)
 function adminAddMusic(event) {
   const file = event.target.files[0];
-  if (!file || file.size > 8 * 1024 * 1024) { alert("Fichier trop grand ou invalide."); return; }
+  if (!file || file.size > 8 * 1024 * 1024) { alert("Fichier trop grand (Max: 8 Mo)."); return; }
   const reader = new FileReader();
   reader.onload = async function(e) {
     const newSong = { name: file.name.replace('.mp3', ''), src: e.target.result };
@@ -120,50 +128,89 @@ function adminAddMusic(event) {
 function renderAdminPlaylist() {
   const cont = document.getElementById('adminPlaylistList');
   if (!cont || !appState.settings.playlist) return;
-  cont.innerHTML = appState.settings.playlist.map((s, i) => `<div style="display:flex;justify-content:space-between;padding:4px;border-bottom:1px solid var(--border)"><span>${s.name}</span><button class="btn btn-xs btn-secondary" onclick="appState.settings.playlist.splice(${i},1);localStorage.setItem('pf_playlist', JSON.stringify(appState.settings.playlist));renderAdminPlaylist();setupAudioPlayer();">❌</button></div>`).join('');
+  cont.innerHTML = appState.settings.playlist.map((s, i) => `<div style="display:flex;justify-content:space-between;padding:4px;border-bottom:1px solid var(--border)"><span>${s.name}</span><button class="btn btn-xs btn-secondary" onclick="adminRemoveSong(${i})">❌</button></div>`).join('');
+}
+function adminRemoveSong(index) {
+  appState.settings.playlist.splice(index, 1);
+  localStorage.setItem('pf_playlist', JSON.stringify(appState.settings.playlist));
+  if (firestore) firestore.collection('settings').doc('global').set({ playlist: appState.settings.playlist }, { merge: true });
+  setupAudioPlayer(); renderAdminPlaylist();
 }
 
 // ============================
-// IMAGE DE FOND CONNEXION
+// IMAGE COMPRESSION (AVATAR, FONDS)
 // ============================
-function uploadAuthBgFromFile(event) {
-  const file = event.target.files[0];
+function compressAndReadFile(file, maxWidth, quality, callback) {
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = async function(e) {
+  reader.onload = function(e) {
     const img = new Image();
-    img.onload = async function() {
+    img.onload = function() {
       const canvas = document.createElement('canvas');
       let width = img.width, height = img.height;
-      if (width > 1600) { height = Math.round((height * 1600) / width); width = 1600; }
+      if (width > maxWidth) { height = Math.round((height * maxWidth) / width); width = maxWidth; }
       canvas.width = width; canvas.height = height;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, width, height);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-      
-      appState.settings.authBgImage = dataUrl;
-      applyTheme();
-      if (firestore) { try { await firestore.collection('settings').doc('global').set({ authBgImage: dataUrl }, { merge: true }); } catch (err) {} }
-      alert('📸 Fond d\'écran de connexion mis à jour avec succès !');
+      callback(canvas.toDataURL('image/jpeg', quality));
     };
     img.src = e.target.result;
   };
   reader.readAsDataURL(file);
 }
 
+function uploadAuthBgFromFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  compressAndReadFile(file, 1600, 0.7, async function(dataUrl) {
+    appState.settings.authBgImage = dataUrl;
+    applyTheme();
+    if (firestore) { try { await firestore.collection('settings').doc('global').set({ authBgImage: dataUrl }, { merge: true }); } catch (err) {} }
+    alert('📸 Fond d\'écran de connexion mis à jour avec succès !');
+  });
+}
+
+function uploadDashboardBgFromFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  compressAndReadFile(file, 1600, 0.7, async function(dataUrl) {
+    appState.settings.dashboardBgImage = dataUrl;
+    applyTheme();
+    if (firestore) { try { await firestore.collection('settings').doc('global').set({ dashboardBgImage: dataUrl }, { merge: true }); } catch (err) {} }
+    alert('📸 Fond d\'écran de l\'Accueil mis à jour avec succès !');
+  });
+}
+
+async function uploadUserAvatar(event) {
+  const file = event.target.files[0];
+  if (!file || !currentUser) return;
+  compressAndReadFile(file, 150, 0.6, async function(dataUrl) {
+    currentUser.avatar = dataUrl;
+    const idx = appState.users.findIndex(u => u.id === currentUser.id);
+    if (idx !== -1) appState.users[idx].avatar = dataUrl;
+    localStorage.setItem('pf_local_users', JSON.stringify(appState.users));
+    localStorage.setItem('pf_cloud_session', JSON.stringify(currentUser));
+    if (firestore) { try { await firestore.collection('users').doc(currentUser.id).update({ avatar: dataUrl }); } catch (err) {} }
+    updateUI(); renderLeaderboard(); renderDashboardLeaderboard();
+    alert('📸 Photo de profil mise à jour !');
+  });
+}
+
 // ============================
-// SYNCHRO API SPORTS (AVEC FEEDBACK VISUEL)
+// SYNCHRO API SPORTS
 // ============================
 async function saveAndSyncApiSports() {
+  const apiKey = document.getElementById('adminApiKeyInput').value.trim() || appState.settings.apiKey || REAL_API_KEY;
+  const statusEl = document.getElementById('apiSyncStatus');
   const btn = document.getElementById('btnSyncApi');
-  btn.innerHTML = "⏳ Recherche des résultats en cours...";
+  btn.innerHTML = "⏳ Recherche en cours...";
   btn.disabled = true;
 
   try {
     const todayStr = new Date().toISOString().split('T')[0];
     const res = await fetch(`https://v3.football.api-sports.io/fixtures?date=${todayStr}`, {
       method: "GET",
-      headers: { "x-apisports-key": REAL_API_KEY }
+      headers: { "x-apisports-key": apiKey }
     });
 
     const data = await res.json();
@@ -174,47 +221,48 @@ async function saveAndSyncApiSports() {
       if (['FT', 'AET', 'PEN'].includes(f.fixture.status.short)) {
         const hName = f.teams.home.name.toLowerCase();
         const aName = f.teams.away.name.toLowerCase();
-
         const match = ALL_MATCHES.find(m => m.home.toLowerCase().includes(hName) || m.away.toLowerCase().includes(aName));
         if (match) { appState.scores[match.id] = { h: f.goals.home, a: f.goals.away }; count++; }
       }
     });
 
     localStorage.setItem('pf_scores_v3', JSON.stringify(appState.scores));
-    if (firestore) { await firestore.collection('settings').doc('global').set({ scores: appState.scores }, { merge: true }); }
-
-    recalculateAllCloudPoints();
-    updateUI();
-    renderMatches();
-    renderLeaderboard();
-    renderDashboardLeaderboard();
-    renderAdminMatchList();
-
-    btn.innerHTML = "⚡ Synchro Vrais Scores";
-    btn.disabled = false;
-    alert(`✅ Merveilleux ! ${count} score(s) de matchs réels synchronisé(s) depuis l'API !`);
+    if (firestore) { await firestore.collection('settings').doc('global').set({ scores: appState.scores, apiKey: apiKey }, { merge: true }); }
+    recalculateAllCloudPoints(); updateUI(); renderMatches(); renderLeaderboard(); renderDashboardLeaderboard(); renderAdminMatchList();
+    
+    btn.innerHTML = "⚡ Synchro Vrais Scores"; btn.disabled = false;
+    statusEl.textContent = `✅ Synchro réussie ! ${count} score(s) récupérés.`;
+    alert(`⚡ Synchro API terminée : ${count} match(s) actualisé(s).`);
   } catch (err) {
-    btn.innerHTML = "⚡ Synchro Vrais Scores";
-    btn.disabled = false;
-    alert("❌ Erreur de l'API : " + err.message);
+    btn.innerHTML = "⚡ Synchro Vrais Scores"; btn.disabled = false;
+    statusEl.textContent = "❌ Erreur API : " + err.message;
+    alert("Erreur API-Sports : " + err.message);
   }
 }
 
 // ============================
-// NOYAU ET NAVIGATION
+// NOYAU ET FIREBASE SYNC
 // ============================
 function applyTheme() {
-  let activeAccent = appState.settings.themeColor || '#00E676';
-  document.documentElement.style.setProperty('--accent', activeAccent);
+  document.documentElement.style.setProperty('--accent', appState.settings.themeColor || '#00E676');
   
   const authScreen = document.getElementById('authScreen');
   if (authScreen) {
     if (appState.settings.authBgImage) {
       authScreen.style.backgroundImage = `url('${appState.settings.authBgImage}')`;
+      authScreen.style.backgroundSize = 'cover';
     } else {
       authScreen.style.background = 'radial-gradient(circle at top, #16213e, #0a0a1a)';
     }
   }
+
+  let bg = appState.settings.bgImage;
+  if (currentLeague === 'dashboard' && appState.settings.dashboardBgImage) {
+    bg = appState.settings.dashboardBgImage;
+  } else if (currentLeague !== 'all' && currentLeague !== 'dashboard' && LEAGUE_INFO[currentLeague]) {
+    bg = appState.settings.leagueBackgrounds[currentLeague] || LEAGUE_INFO[currentLeague].defaultBg;
+  }
+  document.documentElement.style.setProperty('--bg-image', `url('${bg}')`);
 }
 
 function listenCloudData() {
@@ -234,7 +282,7 @@ function listenCloudData() {
         appState.scores = data.scores || {};
         appState.settings = { ...appState.settings, ...data };
         setupAudioPlayer(); applyTheme(); recalculateAllCloudPoints(); updateUI(); renderMatches(); renderLeaderboard(); renderDashboardLeaderboard();
-        if (currentUser && currentUser.role === 'admin') renderAdminMatchList();
+        if (currentUser && currentUser.role === 'admin') { renderAdminMatchList(); if (document.getElementById('adminApiKeyInput')) document.getElementById('adminApiKeyInput').value = appState.settings.apiKey || REAL_API_KEY; }
       }
     });
   } catch (err) {}
@@ -247,7 +295,6 @@ function calcPts(pred, score) {
   const sR = score.h>score.a?'H':score.h<score.a?'A':'D';
   return pR===sR?3:0;
 }
-
 function recalculateAllCloudPoints() {
   appState.users.forEach(u => {
     let t = 0;
@@ -255,7 +302,6 @@ function recalculateAllCloudPoints() {
     u.points = t;
   });
 }
-
 function getUserStats(u) {
   let ex=0, co=0, wr=0, pe=0;
   for (const [id, p] of Object.entries(u.preds || {})) {
@@ -266,10 +312,15 @@ function getUserStats(u) {
   }
   return { exact:ex, correct:co, wrong:wr, pending:pe, total:Object.keys(u.preds||{}).length };
 }
-
 function getSorted() { return [...appState.users].sort((a,b) => b.points - a.points); }
+function getAvatarColor(u) { return AVATAR_COLORS[(u||'A').charCodeAt(0)%AVATAR_COLORS.length]; }
 
 function init() {
+  // Créer un admin par défaut local si personne n'existe
+  if (appState.users.length === 0) {
+    appState.users.push({ id:'admin', username:'Admin', email:'admin@pronofoot.com', pass:'admin123', role:'admin', points:0, preds:{} });
+  }
+
   recalculateAllCloudPoints();
   listenCloudData();
   setupAudioPlayer();
@@ -280,6 +331,7 @@ function init() {
     setupApp();
   } else {
     document.getElementById('authScreen').style.display = 'flex';
+    applyTheme();
   }
 }
 
@@ -295,12 +347,18 @@ function setupApp() {
     document.getElementById('topAdminBtn').style.display = 'block';
     renderAdminMatchList();
     renderAdminPlaylist();
+    if (document.getElementById('adminApiKeyInput')) {
+      document.getElementById('adminApiKeyInput').value = appState.settings.apiKey || REAL_API_KEY;
+    }
   } else {
     document.getElementById('adminNavBtn').style.display = 'none';
     document.getElementById('topAdminBtn').style.display = 'none';
   }
 }
 
+// ============================
+// AUTH SÉCURISÉ (Pseudo ou Email)
+// ============================
 function switchAuth(tab) {
   document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
   document.getElementById('authError').style.display = 'none';
@@ -317,31 +375,30 @@ function switchAuth(tab) {
 
 async function handleLogin(e) {
   e.preventDefault();
-  const emailOrUser = document.getElementById('loginEmail').value.trim();
+  const userOrEmail = document.getElementById('loginEmail').value.trim().toLowerCase();
   const pass = document.getElementById('loginPass').value;
   const btn = document.getElementById('loginBtn');
   btn.innerText = "⏳ Connexion..."; btn.disabled = true;
 
-  const localFound = appState.users.find(x => (x.email.toLowerCase() === emailOrUser.toLowerCase() || x.username.toLowerCase() === emailOrUser.toLowerCase()) && x.pass === pass);
+  // Assurer qu'on a les utilisateurs Firestore avant de vérifier
+  if (firestore && appState.users.length <= 1) {
+    try {
+      const snap = await firestore.collection('users').get();
+      if (!snap.empty) {
+        appState.users = snap.docs.map(d => ({id: d.id, ...d.data()}));
+      }
+    } catch(err) {}
+  }
 
-  if (localFound) {
-    currentUser = localFound;
+  const found = appState.users.find(u => (u.email.toLowerCase() === userOrEmail || u.username.toLowerCase() === userOrEmail) && u.pass === pass);
+
+  if (found) {
+    currentUser = found;
     localStorage.setItem('pf_cloud_session', JSON.stringify(currentUser));
     document.getElementById('authScreen').style.display = 'none';
     setupApp(); btn.innerText = "Se connecter →"; btn.disabled = false; return;
   }
 
-  if (firestore) {
-    try {
-      const query = await firestore.collection('users').where('email', '==', emailOrUser).where('pass', '==', pass).get();
-      if (!query.empty) {
-        currentUser = { id: query.docs[0].id, ...query.docs[0].data() };
-        localStorage.setItem('pf_cloud_session', JSON.stringify(currentUser));
-        document.getElementById('authScreen').style.display = 'none';
-        setupApp(); btn.innerText = "Se connecter →"; btn.disabled = false; return;
-      }
-    } catch (err) {}
-  }
   document.getElementById('authError').textContent = 'Identifiant ou mot de passe incorrect.';
   document.getElementById('authError').style.display = 'block';
   btn.innerText = "Se connecter →"; btn.disabled = false;
@@ -354,6 +411,12 @@ async function handleRegister(e) {
   const pass = document.getElementById('regPass').value;
   const btn = document.getElementById('registerBtn');
   btn.innerText = "⏳ Création..."; btn.disabled = true;
+
+  if (appState.users.find(u => u.username.toLowerCase() === username.toLowerCase())) {
+    document.getElementById('authError').textContent = 'Pseudo déjà utilisé.';
+    document.getElementById('authError').style.display = 'block';
+    btn.innerText = "Créer mon compte →"; btn.disabled = false; return;
+  }
 
   const newUser = { id: 'u_' + Date.now(), username, email, pass, role: 'user', points: 0, preds: {}, createdAt: new Date().toISOString() };
   if (firestore) { try { const ref = await firestore.collection('users').add(newUser); newUser.id = ref.id; } catch (e) {} }
@@ -368,39 +431,43 @@ async function handleRegister(e) {
 function handleLogout() { localStorage.removeItem('pf_cloud_session'); currentUser = null; location.reload(); }
 function togglePassword(inputId) { const input = document.getElementById(inputId); input.type = input.type === "password" ? "text" : "password"; }
 
-function setupMonthFilter() {
-  const d = new Date();
-  const m = (d.getMonth() + 1).toString().padStart(2, '0');
-  currentMonth = m;
-  const bar = document.getElementById('monthFilterBar');
-  if (!bar) return;
-  const months = [{val:'all', lbl:'Toute l\'année'}, {val:'08',lbl:'Août'}, {val:'09',lbl:'Septembre'}, {val:'10',lbl:'Octobre'}, {val:'11',lbl:'Novembre'}, {val:'12',lbl:'Décembre'}, {val:'01',lbl:'Janvier'}, {val:'02',lbl:'Février'}, {val:'03',lbl:'Mars'}, {val:'04',lbl:'Avril'}, {val:'05',lbl:'Mai'}];
-  let html = ''; months.forEach(mo => { const isAct = mo.val === currentMonth; html += `<button class="matchday-pill ${isAct?'active':''}" onclick="filterByMonth('${mo.val}')">${mo.lbl}</button>`; });
-  bar.innerHTML = html;
+function forgotPassword() {
+  const email = prompt("Entrez votre adresse email :");
+  if (!email) return;
+  const user = appState.users.find(u => u.email.toLowerCase() === email.toLowerCase());
+  if (user) {
+    const tempPass = Math.random().toString(36).slice(-8);
+    alert(`✅ Mot de passe temporaire : ${tempPass}\n\nNotez-le et connectez-vous.`);
+    user.pass = tempPass;
+    if (firestore) firestore.collection('users').doc(user.id).update({ pass: tempPass });
+  } else { alert("❌ Adresse email non trouvée."); }
 }
 
-function filterByMonth(m) { currentMonth = m; document.querySelectorAll('#monthFilterBar .matchday-pill').forEach(b => b.classList.remove('active')); if (event && event.target) event.target.classList.add('active'); renderMatches(); }
-function filterLeague(l) { currentLeague = l; applyTheme(); document.querySelectorAll('#page-matches .league-tab').forEach(t => t.classList.remove('active')); if (event && event.target) event.target.classList.add('active'); renderMatches(); }
-
-function navigateTo(p) {
-  if (p === 'admin') {
-    if (!currentUser || currentUser.role !== 'admin') { alert("⛔ Accès refusé ! Réservé à l'administrateur."); return; }
-  }
-  document.querySelectorAll('.page-section').forEach(s => s.classList.remove('active'));
-  document.querySelectorAll('.bottom-nav-item').forEach(b => b.classList.remove('active'));
-  const page = document.getElementById('page-' + p);
-  if (page) page.classList.add('active');
-  const btn = document.querySelector(`[onclick="navigateTo('${p}')"]`);
-  if (btn) btn.classList.add('active');
-  if (p === 'admin') { renderAdminMatchList(); renderAdminPlaylist(); }
-  if (p === 'leaderboard') renderLeaderboard();
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+// ============================
+// INTERFACE ET NAVIGATION
+// ============================
+function getAvatarHtml(u, sizePx = 32, fontSize = 0.8) {
+  if (u && u.avatar) return `<div style="width:${sizePx}px;height:${sizePx}px;border-radius:50%;background-image:url('${u.avatar}');background-size:cover;background-position:center;border:1px solid var(--border);flex-shrink:0"></div>`;
+  const name = (u && u.username) ? u.username : 'A';
+  return `<div style="width:${sizePx}px;height:${sizePx}px;border-radius:50%;background:${getAvatarColor(name)};display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:${fontSize}rem;flex-shrink:0;color:white;border:1px solid var(--border)">${name[0].toUpperCase()}</div>`;
 }
 
 function updateUI() {
   if (!currentUser) return;
   document.getElementById('navPoints').textContent = currentUser.points + ' pts';
-  document.getElementById('navAvatar').textContent = (currentUser.username || 'A')[0].toUpperCase();
+  
+  if (currentUser.avatar) {
+    document.getElementById('navAvatar').innerHTML = '';
+    document.getElementById('navAvatar').style.backgroundImage = `url('${currentUser.avatar}')`;
+    document.getElementById('profileBigAvatar').innerHTML = '';
+    document.getElementById('profileBigAvatar').style.backgroundImage = `url('${currentUser.avatar}')`;
+  } else {
+    document.getElementById('navAvatar').textContent = (currentUser.username || 'A')[0].toUpperCase();
+    document.getElementById('navAvatar').style.background = getAvatarColor(currentUser.username);
+    document.getElementById('profileBigAvatar').textContent = (currentUser.username || 'A')[0].toUpperCase();
+    document.getElementById('profileBigAvatar').style.background = getAvatarColor(currentUser.username);
+  }
+
   document.getElementById('welcomeMsg').textContent = 'Bienvenue, ' + currentUser.username + ' ! 👋';
   const st = getUserStats(currentUser);
   document.getElementById('statPoints').textContent = currentUser.points;
@@ -420,7 +487,7 @@ function renderDashboardLeaderboard() {
     const isMe = currentUser && u.id === currentUser.id;
     const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':'';
     const pct = max > 0 ? Math.round((u.points / max) * 100) : 0;
-    html += `<div style="display:flex;align-items:center;gap:10px;padding:10px;background:${isMe?'rgba(0,230,118,0.1)':'var(--bg-card)'};border:1px solid ${isMe?'var(--accent)':'var(--border)'};border-radius:8px;margin-bottom:6px"><span style="font-weight:800;min-width:30px;color:${i<3?'var(--gold)':'var(--text-muted)'}">${medal||'#'+(i+1)}</span><div style="flex:1"><div style="font-weight:700;font-size:0.9rem">${u.username} ${u.role==='admin'?'⭐':''}</div><div style="height:4px;background:var(--bg-body);border-radius:2px;margin-top:4px"><div style="height:100%;width:${pct}%;background:var(--accent);border-radius:2px"></div></div></div><span style="font-weight:800;color:var(--gold)">${u.points} pts</span></div>`;
+    html += `<div style="display:flex;align-items:center;gap:10px;padding:10px;background:${isMe?'rgba(0,230,118,0.1)':'var(--bg-card)'};border:1px solid ${isMe?'var(--accent)':'var(--border)'};border-radius:8px;margin-bottom:6px"><span style="font-weight:800;min-width:30px;color:${i<3?'var(--gold)':'var(--text-muted)'}">${medal||'#'+(i+1)}</span>${getAvatarHtml(u, 32, 0.8)}<div style="flex:1"><div style="font-weight:700;font-size:0.9rem">${u.username} ${u.role==='admin'?'⭐':''}</div><div style="height:4px;background:var(--bg-body);border-radius:2px;margin-top:4px"><div style="height:100%;width:${pct}%;background:var(--accent);border-radius:2px"></div></div></div><span style="font-weight:800;color:var(--gold)">${u.points} pts</span></div>`;
   });
   document.getElementById('dashboardLeaderboard').innerHTML = html;
 }
@@ -432,11 +499,24 @@ function renderLeaderboard() {
     const isMe = currentUser && u.id === currentUser.id;
     const st = getUserStats(u);
     const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':'#'+(i+1);
-    html += `<tr class="${isMe?'current-user':''}"><td>${medal}</td><td><strong>${u.username}</strong> ${u.role==='admin'?'⭐':''}</td><td>${st.total}</td><td style="color:var(--gold);font-weight:bold">${st.exact}</td><td style="color:var(--green);font-weight:bold">${st.correct}</td><td style="font-size:1.1rem;font-weight:800">${u.points} pts</td></tr>`;
+    html += `<tr class="${isMe?'current-user':''}"><td>${medal}</td><td><div style="display:flex;align-items:center;gap:8px">${getAvatarHtml(u, 26, 0.7)}<strong>${u.username}</strong> ${u.role==='admin'?'⭐':''}</div></td><td>${st.total}</td><td style="color:var(--gold);font-weight:bold">${st.exact}</td><td style="color:var(--green);font-weight:bold">${st.correct}</td><td style="font-size:1.1rem;font-weight:800">${u.points} pts</td></tr>`;
   });
   html += '</tbody></table>';
   document.getElementById('leaderboardContainer').innerHTML = html;
 }
+
+function setupMonthFilter() {
+  const d = new Date();
+  const m = (d.getMonth() + 1).toString().padStart(2, '0');
+  currentMonth = m;
+  const bar = document.getElementById('monthFilterBar');
+  if (!bar) return;
+  const months = [{val:'all', lbl:'Toute l\'année'}, {val:'08',lbl:'Août'}, {val:'09',lbl:'Septembre'}, {val:'10',lbl:'Octobre'}, {val:'11',lbl:'Novembre'}, {val:'12',lbl:'Décembre'}, {val:'01',lbl:'Janvier'}, {val:'02',lbl:'Février'}, {val:'03',lbl:'Mars'}, {val:'04',lbl:'Avril'}, {val:'05',lbl:'Mai'}];
+  let html = ''; months.forEach(mo => { const isAct = mo.val === currentMonth; html += `<button class="matchday-pill ${isAct?'active':''}" onclick="filterByMonth('${mo.val}')">${mo.lbl}</button>`; });
+  bar.innerHTML = html;
+}
+function filterByMonth(m) { currentMonth = m; document.querySelectorAll('#monthFilterBar .matchday-pill').forEach(b => b.classList.remove('active')); if (event && event.target) event.target.classList.add('active'); renderMatches(); }
+function filterLeague(l) { currentLeague = l; applyTheme(); document.querySelectorAll('#page-matches .league-tab').forEach(t => t.classList.remove('active')); if (event && event.target) event.target.classList.add('active'); renderMatches(); }
 
 function toggleMatchPredictions(matchId) {
   const el = document.getElementById('all_preds_' + matchId);
@@ -451,7 +531,7 @@ function toggleMatchPredictions(matchId) {
         count++;
         let resLbl = '';
         if (score) { const pts = calcPts(pred, score); resLbl = `<span class="${pts===5?'pts-exact':pts===3?'pts-correct':'pts-wrong'}" style="margin-left:auto;font-weight:bold">(+${pts} pts)</span>`; }
-        html += `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:0.85rem"><span style="flex:1"><strong>${u.username}</strong></span><span style="background:var(--bg-body);padding:2px 8px;border-radius:4px;font-weight:bold">${pred.h} - ${pred.a}</span>${resLbl}</div>`;
+        html += `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:0.85rem">${getAvatarHtml(u,20,0.6)}<span style="flex:1"><strong>${u.username}</strong></span><span style="background:var(--bg-body);padding:2px 8px;border-radius:4px;font-weight:bold">${pred.h} - ${pred.a}</span>${resLbl}</div>`;
       }
     });
     if (count === 0) html += '<p style="color:var(--text-muted);font-size:0.8rem">Aucun joueur n\'a pronostiqué ce match.</p>';
@@ -472,8 +552,6 @@ function renderMatches() {
     const score = appState.scores[m.id];
     const done = !!score;
     const li = LEAGUE_INFO[m.league] || { name:m.league, flag:'⚽' };
-    const homeCrest = getTeamCrest(m.home);
-    const awayCrest = getTeamCrest(m.away);
     let totalPredsForMatch = 0; appState.users.forEach(u => { if (u.preds && u.preds[m.id] && u.preds[m.id].h !== '') totalPredsForMatch++; });
 
     let res = '';
@@ -488,9 +566,9 @@ function renderMatches() {
       <div class="match-card ${done?'finished':''}">
         <div class="match-header"><span>${li.flag} <strong>${li.name}</strong></span><span style="color:var(--gold)">📅 ${m.date}</span></div>
         <div class="match-teams">
-          <div class="match-team home"><span>${m.home}</span><img src="${homeCrest}" class="team-crest"></div>
+          <div class="match-team home"><span>${m.home}</span><img src="${getTeamCrest(m.home)}" class="team-crest"></div>
           <div class="match-vs">${done ? score.h + ' - ' + score.a : 'VS'}</div>
-          <div class="match-team away"><img src="${awayCrest}" class="team-crest"><span>${m.away}</span></div>
+          <div class="match-team away"><img src="${getTeamCrest(m.away)}" class="team-crest"><span>${m.away}</span></div>
         </div>
         ${!done ? `<div class="match-prediction"><input type="number" min="0" max="15" value="${pred.h}" id="h_${m.id}" placeholder="-"><span>:</span><input type="number" min="0" max="15" value="${pred.a}" id="a_${m.id}" placeholder="-"></div>` : ''}
         ${res}
@@ -543,4 +621,19 @@ async function adminSaveScore(id) {
   recalculateAllCloudPoints(); updateUI(); renderMatches(); renderLeaderboard(); renderDashboardLeaderboard(); renderAdminMatchList();
   alert('Score enregistré et points recalculés ! ⚡');
 }
+
+function navigateTo(p) {
+  if (p === 'admin') { if (!currentUser || currentUser.role !== 'admin') { alert("⛔ Accès refusé ! Réservé à l'administrateur."); return; } }
+  if (p === 'dashboard') { currentLeague = 'dashboard'; applyTheme(); } else { currentLeague = 'all'; applyTheme(); }
+  document.querySelectorAll('.page-section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.bottom-nav-item').forEach(b => b.classList.remove('active'));
+  const page = document.getElementById('page-' + p);
+  if (page) page.classList.add('active');
+  const btn = document.querySelector(`[onclick="navigateTo('${p}')"]`);
+  if (btn) btn.classList.add('active');
+  if (p === 'admin') { renderAdminMatchList(); renderAdminPlaylist(); }
+  if (p === 'leaderboard') renderLeaderboard();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
 window.onload = init;
