@@ -11,9 +11,10 @@
 </head>
 <body>
 
+  <!-- ELEMENT AUDIO CACHÉ DU SITE -->
   <audio id="siteAudioPlayer"></audio>
 
-  <!-- CONNEXION / INSCRIPTION -->
+  <!-- CONNEXION / INSCRIPTION SÉCURISÉE -->
   <div class="auth-overlay" id="authScreen" style="display:none">
     <div class="auth-card">
       <div class="auth-header">
@@ -22,15 +23,15 @@
       </div>
 
       <div class="auth-tabs">
-        <button class="auth-tab active" onclick="switchAuth('login')" id="tabLogin">Connexion</button>
-        <button class="auth-tab" onclick="switchAuth('register')" id="tabReg">Inscription</button>
+        <button class="auth-tab active" onclick="switchAuth('login')">Connexion</button>
+        <button class="auth-tab" onclick="switchAuth('register')">Inscription</button>
       </div>
 
       <div id="authError" style="color:var(--danger);font-size:0.85rem;margin-bottom:12px;display:none;text-align:center;font-weight:bold"></div>
 
-      <!-- FORMULAIRE DE CONNEXION (Pseudo OU Email autorisé) -->
+      <!-- Formulaire Connexion -->
       <form id="loginForm" onsubmit="handleLogin(event)">
-        <div class="form-group"><label>📧 Adresse Email ou Pseudo</label><input type="text" id="loginEmail" placeholder="ton@email.com ou Mathis_92" required></div>
+        <div class="form-group"><label>📧 Adresse Email ou Pseudo</label><input type="text" id="loginEmail" placeholder="ton@email.com" required></div>
         <div class="form-group">
           <label>🔒 Mot de passe</label>
           <input type="password" id="loginPass" placeholder="••••••••" required>
@@ -42,7 +43,7 @@
         </div>
       </form>
 
-      <!-- FORMULAIRE INSCRIPTION -->
+      <!-- Formulaire Inscription -->
       <form id="registerForm" style="display:none" onsubmit="handleRegister(event)">
         <div class="form-group"><label>👤 Pseudo de joueur</label><input type="text" id="regUser" placeholder="Ex: Mathis_92" required minlength="3"></div>
         <div class="form-group"><label>📧 Adresse Email</label><input type="email" id="regEmail" placeholder="ton@email.com" required></div>
@@ -121,7 +122,7 @@
           <div class="stat-card"><div class="val" id="statPoints">0</div><div class="lbl">Mes Points</div></div>
           <div class="stat-card"><div class="val" id="statRank">#-</div><div class="lbl">Mon Rang Global</div></div>
           <div class="stat-card"><div class="val" id="statPredictions">0</div><div class="lbl">Mes Pronos</div></div>
-          <div class="stat-card"><div class="val" id="statExact">0</div><div class="lbl">Scores Exacts</div></div>
+          <div class="stat-card"><div class="val" id="statExact">0</div><div class="lbl">Scores Exacts (+5)</div></div>
         </div>
 
         <div style="margin-bottom:20px">
@@ -133,7 +134,7 @@
           </button>
         </div>
 
-        <h3 style="margin-bottom:12px">🏆 Top 5 Général</h3>
+        <h3 style="margin-bottom:12px">🏆 Top 5 Général (Saison 2026-27)</h3>
         <div id="dashboardLeaderboard" style="margin-bottom:20px"></div>
       </div>
 
@@ -171,10 +172,13 @@
       <!-- GROUPES PRIVÉS -->
       <div class="page-section" id="page-groups">
         <h3 style="margin-bottom:5px" class="league-title-special">👥 Mes Groupes Privés</h3>
+        <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:20px">Créez votre ligue privée ou rejoignez vos amis avec leur code !</p>
+
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
           <button class="btn btn-primary" onclick="showCreateGroupPrompt()">➕ Créer un Groupe</button>
           <button class="btn btn-gold" onclick="showJoinGroupPrompt()">🔑 Rejoindre (Code)</button>
         </div>
+
         <div id="groupsListContainer"></div>
       </div>
 
@@ -188,20 +192,80 @@
             <button type="submit" class="btn btn-primary">Envoyer 🚀</button>
           </form>
         </div>
+
+        <div class="poll-card">
+          <h4 style="color:var(--gold);margin-bottom:8px">📊 Sondage de la Communauté</h4>
+          <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:12px">Qui va remporter la Ligue des Champions 2026-27 ?</p>
+          
+          <div class="poll-option" onclick="votePoll('real')">
+            <div class="poll-bar" id="bar_real" style="width:45%"></div>
+            <span style="position:relative">👑 Real Madrid</span>
+            <span style="position:relative" id="count_real">45%</span>
+          </div>
+          <div class="poll-option" onclick="votePoll('psg')">
+            <div class="poll-bar" id="bar_psg" style="width:30%"></div>
+            <span style="position:relative">🔴🔵 Paris SG</span>
+            <span style="position:relative" id="count_psg">30%</span>
+          </div>
+          <div class="poll-option" onclick="votePoll('mancity')">
+            <div class="poll-bar" id="bar_mancity" style="width:25%"></div>
+            <span style="position:relative">🩵 Manchester City</span>
+            <span style="position:relative" id="count_mancity">25%</span>
+          </div>
+        </div>
       </div>
 
-      <!-- PROFIL -->
+      <!-- BONUS -->
+      <div class="page-section" id="page-bonuses">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px">
+          <div><h3 class="league-title-special">🎯 Bonus de Fin de Saison</h3><p style="font-size:0.85rem;color:var(--text-muted)">Pronostique les vainqueurs finaux !</p></div>
+          <button class="btn btn-gold btn-sm" onclick="saveBonuses()">💾 Sauvegarder</button>
+        </div>
+        <div id="bonusesContainer" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:15px"></div>
+      </div>
+
+      <!-- RÈGLES -->
+      <div class="page-section" id="page-rules">
+        <h3 style="margin-bottom:15px" class="league-title-special">📜 Règles Officielles</h3>
+        <div class="rules-box">
+          <h3>🎮 Système de Points</h3>
+          <div class="rules-highlight"><strong>🎯 Score Exact = 5 Points</strong></div>
+          <div class="rules-highlight"><strong>✅ Bon Vainqueur / Nul = 3 Points</strong></div>
+          <div class="rules-highlight"><strong>❌ Mauvais Résultat = 0 Point</strong></div>
+        </div>
+      </div>
+
+      <!-- PROFIL (AVEC AFFICHAGE DÉTAILLÉ DU SOLDE ET INFOS) -->
       <div class="page-section" id="page-profile">
-        <h3 style="margin-bottom:15px" class="league-title-special">👤 Mon Profil</h3>
-        <div class="admin-card" style="text-align:center;max-width:400px;margin:0 auto">
+        <h3 style="margin-bottom:15px" class="league-title-special">👤 Mon Profil Joueur</h3>
+        <div class="admin-card" style="text-align:center;max-width:420px;margin:0 auto">
+          
           <label style="cursor:pointer;display:block;margin:0 auto 12px;width:100px;height:100px;border-radius:50%;position:relative" title="Cliquez pour changer votre photo">
             <div class="profile-avatar-large" id="profileBigAvatar">?</div>
             <div class="profile-avatar-overlay" style="position:absolute;inset:0;background:rgba(0,0,0,0.5);border-radius:50%;display:flex;align-items:center;justify-content:center;opacity:0;transition:0.2s"><span style="font-size:1.5rem">📸</span></div>
             <input type="file" accept="image/*" style="display:none" onchange="uploadUserAvatar(event)">
           </label>
-          <h2 id="profileUsername">-</h2>
-          <p id="profileEmail" style="color:var(--text-muted);font-size:0.85rem;margin-bottom:8px">-</p>
-          <button class="btn btn-secondary" style="width:100%;margin-top:10px" onclick="handleLogout()">🚪 Se Déconnecter</button>
+
+          <h2 id="profileUsername" style="font-size:1.5rem;font-weight:900;margin-bottom:2px">-</h2>
+          <p id="profileEmail" style="color:var(--text-muted);font-size:0.85rem;margin-bottom:4px">-</p>
+          <p id="profileRole" style="color:var(--gold);font-size:0.85rem;font-weight:bold;margin-bottom:15px"></p>
+
+          <!-- BLOC SOLDE DE POINTS ET CLASSEMENT SUR LE PROFIL -->
+          <div class="stats-grid" style="margin-bottom:15px">
+            <div class="stat-card" style="padding:12px">
+              <div class="val" id="profilePoints" style="font-size:1.5rem;color:var(--accent)">0</div>
+              <div class="lbl" style="font-size:0.7rem">Solde de Points</div>
+            </div>
+            <div class="stat-card" style="padding:12px">
+              <div class="val" id="profileRank" style="font-size:1.5rem;color:var(--gold)">#-</div>
+              <div class="lbl" style="font-size:0.7rem">Rang Officiel</div>
+            </div>
+          </div>
+
+          <button class="btn btn-whatsapp" style="width:100%;margin-bottom:10px" onclick="shareChallengeWhatsApp()">
+            📲 Partager mes stats sur WhatsApp
+          </button>
+          <button class="btn btn-secondary" style="width:100%" onclick="handleLogout()">🚪 Se Déconnecter</button>
         </div>
       </div>
 
@@ -211,7 +275,6 @@
 
         <div class="admin-card" style="border:2px solid var(--accent)">
           <h4 style="color:var(--accent)">🖼️ Fonds d'Écran</h4>
-          
           <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:5px">1. Fond de la page de Connexion :</p>
           <div class="form-group" style="margin-bottom:15px">
             <label style="background:var(--accent);color:#000;padding:12px;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-size:0.85rem;font-weight:bold;width:100%;justify-content:center">
@@ -242,10 +305,9 @@
 
         <div class="admin-card" style="border:2px solid var(--gold)">
           <h4 style="color:var(--gold)">⚡ Synchronization API Sports</h4>
-          <div class="form-group" style="margin-bottom:10px">
-            <input type="text" id="adminApiKeyInput" placeholder="Clé API-Sports..." style="font-family:monospace">
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-gold btn-sm" style="flex:1" id="btnSyncApi" onclick="saveAndSyncApiSports()">⚡ Synchro Vrais Scores</button>
           </div>
-          <button class="btn btn-gold btn-sm" id="btnSyncApi" style="width:100%" onclick="saveAndSyncApiSports()">⚡ Synchro Vrais Scores</button>
         </div>
 
         <div class="admin-grid">
@@ -256,6 +318,16 @@
         </div>
       </div>
 
+    </div>
+
+    <!-- FOOTER -->
+    <div class="site-footer">
+      <p>⚽ PronoFoot — Compétition Européenne 2026-27</p>
+      <p style="margin-top:6px">
+        <a onclick="navigateTo('rules')">📜 Règles Officielles</a> · 
+        <a onclick="navigateTo('chat')">💬 Chat Général</a> · 
+        <a onclick="navigateTo('legal')">🔒 Confidentialité</a>
+      </p>
     </div>
   </div>
 
