@@ -15,12 +15,6 @@ try {
 
 const REAL_API_KEY = "5eb745d2e42b3f1e72fddff81191592e";
 
-// SÉCURITÉ UNIVERSELLE DOM (EMPÊCHE LE BLOCAGE DU SCRIPT SI UN ÉLÉMENT EST ABSENT)
-function safeSetText(id, text) {
-  const el = document.getElementById(id);
-  if (el) el.textContent = text;
-}
-
 const TEAM_CRESTS = {
   "Arsenal": "https://media.api-sports.io/football/teams/42.png", "Manchester City": "https://media.api-sports.io/football/teams/50.png",
   "Liverpool": "https://media.api-sports.io/football/teams/40.png", "Manchester United": "https://media.api-sports.io/football/teams/33.png",
@@ -50,9 +44,13 @@ let appState = {
 let currentUser = JSON.parse(localStorage.getItem('pf_cloud_session')) || null;
 let currentLeague = 'all';
 let currentMonth = 'all';
-let currentMatchView = 'upcoming';
 
+// ==========================================
+// OUTILS DE BASE
+// ==========================================
+function safeSetText(id, text) { const el = document.getElementById(id); if (el) el.textContent = text; }
 function getTeamCrest(name) { return TEAM_CRESTS[name] || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=1a1a1c&color=fff&size=64&bold=true`; }
+function getAvatarColor(u) { return AVATAR_COLORS[(u||'A').charCodeAt(0)%AVATAR_COLORS.length]; }
 
 function parseMatchDateTime(dateStr, timeStr = "20:00") {
   if (!dateStr) return new Date(2099, 0, 1);
@@ -63,6 +61,36 @@ function parseMatchDateTime(dateStr, timeStr = "20:00") {
 }
 function hasMatchStarted(dateStr, timeStr) { return new Date() >= parseMatchDateTime(dateStr, timeStr); }
 
+function calcPts(pred, score) {
+  if (!pred || pred.h==='' || pred.a==='' || !score) return 0;
+  if (pred.h===score.h && pred.a===score.a) return 5;
+  const pR = pred.h>pred.a?'H':pred.h<pred.a?'A':'D';
+  const sR = score.h>score.a?'H':score.h<score.a?'A':'D';
+  return pR===sR?3:0;
+}
+
+function recalculateAllCloudPoints() {
+  appState.users.forEach(u => {
+    let t = 0;
+    for (const [id, p] of Object.entries(u.preds || {})) { const s = appState.scores[id]; if (s && s.status!=='LIVE') t += calcPts(p, s); }
+    u.points = t;
+  });
+}
+
+function getUserStats(u) {
+  let ex=0, co=0;
+  for (const [id, p] of Object.entries(u.preds || {})) {
+    const s = appState.scores[id];
+    if (s && s.status!=='LIVE') { const pts = calcPts(p, s); if (pts===5) ex++; else if (pts===3) co++; }
+  }
+  return { exact:ex, correct:co, total:Object.keys(u.preds||{}).length };
+}
+
+function getSorted() { return [...appState.users].sort((a,b) => b.points - a.points); }
+
+// ==========================================
+// COMPRESSION D'IMAGES & AVATARS
+// ==========================================
 function compressImage(file, maxWidth, quality, callback) {
   if (!file) return;
   const reader = new FileReader();
@@ -93,21 +121,56 @@ function uploadUserAvatar(event) {
   });
 }
 
-function uploadAuthBgFromFile(event) {
-  compressImage(event.target.files[0], 800, 0.4, async d => {
-    appState.settings.authBgImage = d; applyTheme();
-    if (firestore) { try { await firestore.collection('settings').doc('global').set({ authBgImage: d }, { merge: true }); } catch (err) {} }
-    alert("✅ Fond Connexion OK !");
-  });
+// ==========================================
+// LECTEUR MUSICAL MP3
+// ==========================================
+let audioPlayer = null, currentSongIndex = 0, isMusicPlaying = false;
+function setupAudioPlayer() {
+  audioPlayer = document.getElementById('siteAudioPlayer');
+  if (!audioPlayer) return;
+  audioPlayer.onended = () => { nextSong(); };
+  renderPlaylistUI(); loadSong(currentSongIndex);
 }
-function uploadDashboardBgFromFile(event) {
-  compressImage(event.target.files[0], 800, 0.4, async d => {
-    appState.settings.dashboardBgImage = d; applyTheme();
-    if (firestore) { try { await firestore.collection('settings').doc('global').set({ dashboardBgImage: d }, { merge: true }); } catch (err) {} }
-    alert("✅ Fond Accueil OK !");
-  });
+function loadSong(index) {
+  if (!appState.settings.playlist || appState.settings.playlist.length === 0) return;
+  if (index < 0) index = appState.settings.playlist.length - 1;
+  if (index >= appState.settings.playlist.length) index = 0;
+  currentSongIndex = index;
+  audioPlayer.src = appState.settings.playlist[index].src;
+  document.getElementById('musicTitleDisplay').textContent = appState.settings.playlist[index].name;
+  if (isMusicPlaying) audioPlayer.play();
+}
+function toggleSiteMusic() {
+  if (!appState.settings.playlist || appState.settings.playlist.length === 0) return;
+  const icon = document.getElementById('musicStatusIcon');
+  const btn = document.getElementById('musicPlayBtn');
+  if (isMusicPlaying) { audioPlayer.pause(); isMusicPlaying = false; icon.textContent = "🎵"; if (btn) btn.textContent = "▶️"; }
+  else { audioPlayer.play().then(() => { isMusicPlaying = true; icon.textContent = "🔊"; if (btn) btn.textContent = "⏸"; }).catch(()=>{}); }
+}
+function nextSong() { loadSong(currentSongIndex + 1); }
+function prevSong() { loadSong(currentSongIndex - 1); }
+function renderPlaylistUI() {
+  const container = document.getElementById('playlistContainer');
+  if (!container || !appState.settings.playlist) return;
+  container.innerHTML = appState.settings.playlist.map((song, i) => `<div class="playlist-item" onclick="loadSong(${i});if(!isMusicPlaying)toggleSiteMusic();">🎵 ${song.name}</div>`).join('');
 }
 
+// ==========================================
+// GESTION DU THÈME
+// ==========================================
+function applyTheme() {
+  document.documentElement.style.setProperty('--accent', appState.settings.themeColor || '#00E676');
+  const authScreen = document.getElementById('authScreen');
+  if (authScreen) { authScreen.style.backgroundImage = appState.settings.authBgImage ? `url('${appState.settings.authBgImage}')` : 'none'; authScreen.style.backgroundSize = 'cover'; }
+  let bg = appState.settings.bgImage;
+  if (currentLeague === 'dashboard' && appState.settings.dashboardBgImage) bg = appState.settings.dashboardBgImage;
+  else if (currentLeague !== 'all' && currentLeague !== 'dashboard' && LEAGUE_INFO[currentLeague]) { bg = (appState.settings.leagueBackgrounds && appState.settings.leagueBackgrounds[currentLeague]) || LEAGUE_INFO[currentLeague].defaultBg; }
+  document.documentElement.style.setProperty('--bg-image', bg ? `url('${bg}')` : 'none');
+}
+
+// ==========================================
+// DÉMARRAGE & SYNCHRONISATION FIREBASE
+// ==========================================
 function listenCloudData() {
   if (!firestore) return;
   firestore.collection('users').onSnapshot(snap => {
@@ -122,109 +185,33 @@ function listenCloudData() {
       const data = doc.data();
       appState.scores = data.scores || {};
       appState.settings = { ...appState.settings, ...data };
-      applyTheme(); recalculateAllCloudPoints(); updateUI(); renderMatches(); renderLeaderboard(); renderDashboardLeaderboard();
-      if (currentUser && currentUser.role === 'admin') renderAdminMatchList();
+      applyTheme(); recalculateAllCloudPoints(); updateUI(); renderMatches(); renderLeaderboard(); renderDashboardLeaderboard(); setupAudioPlayer();
+      if (currentUser && currentUser.role === 'admin') { renderAdminMatchList(); renderAdminLeagueBanners(); renderAdminLeagueBackgrounds(); renderAdminPlaylist(); renderAdminStats(); }
     }
   });
 }
 
-function calcPts(pred, score) {
-  if (!pred || pred.h==='' || pred.a==='' || !score) return 0;
-  if (pred.h===score.h && pred.a===score.a) return 5;
-  const pR = pred.h>pred.a?'H':pred.h<pred.a?'A':'D';
-  const sR = score.h>score.a?'H':score.h<score.a?'A':'D';
-  return pR===sR?3:0;
-}
-
-function recalculateAllCloudPoints() {
-  appState.users.forEach(u => {
-    let t = 0;
-    for (const [id, p] of Object.entries(u.preds || {})) { const s = appState.scores[id]; if (s && s.status!=='LIVE') t += calcPts(p, s); }
-    u.points = t;
-  });
-}
-
-function getUserStats(u) {
-  let ex=0, co=0, total=Object.keys(u.preds||{}).length;
-  for (const [id, p] of Object.entries(u.preds || {})) {
-    const s = appState.scores[id];
-    if (s && s.status!=='LIVE') { const pts = calcPts(p, s); if (pts===5) ex++; else if (pts===3) co++; }
-  }
-  let winRate = total > 0 ? (((ex + co) / total) * 100).toFixed(0) : 0;
-  let exactRate = total > 0 ? ((ex / total) * 100).toFixed(0) : 0;
-  return { exact:ex, correct:co, total, winRate, exactRate };
-}
-
-function getSorted() { return [...appState.users].sort((a,b) => b.points - a.points); }
-function getAvatarColor(u) { return AVATAR_COLORS[(u||'A').charCodeAt(0)%AVATAR_COLORS.length]; }
-
-function applyTheme() {
-  document.documentElement.style.setProperty('--accent', appState.settings.themeColor || '#00E676');
-  const authScreen = document.getElementById('authScreen');
-  if (authScreen) { authScreen.style.backgroundImage = appState.settings.authBgImage ? `url('${appState.settings.authBgImage}')` : 'none'; authScreen.style.backgroundSize = 'cover'; }
-  let bg = appState.settings.bgImage;
-  if (currentLeague === 'dashboard' && appState.settings.dashboardBgImage) bg = appState.settings.dashboardBgImage;
-  document.documentElement.style.setProperty('--bg-image', bg ? `url('${bg}')` : 'none');
-}
-
 function init() {
   if (appState.users.length === 0) appState.users.push({ id:'admin', username:'Admin', email:'admin@pronofoot.com', pass:'admin123', role:'admin', points:0, preds:{} });
-  recalculateAllCloudPoints(); listenCloudData(); setupMonthFilter();
+  recalculateAllCloudPoints(); listenCloudData(); setupMonthFilter(); setupAudioPlayer();
   if (currentUser) { document.getElementById('authScreen').style.display = 'none'; setupApp(); } 
   else { document.getElementById('authScreen').style.display = 'flex'; applyTheme(); }
 }
 
 function setupApp() {
-  applyTheme(); updateUI(); renderMatches(); renderLeaderboard(); renderDashboardLeaderboard(); renderMyPredictions();
+  applyTheme(); updateUI(); renderMatches(); renderLeaderboard(); renderDashboardLeaderboard();
   if (currentUser && currentUser.role === 'admin') {
     document.getElementById('adminNavBtn').style.display = 'flex';
     document.getElementById('topAdminBtn').style.display = 'block';
-    renderAdminMatchList(); renderAdminStats();
+    renderAdminMatchList(); renderAdminLeagueBanners(); renderAdminLeagueBackgrounds(); renderAdminPlaylist(); renderAdminStats();
   } else {
     document.getElementById('adminNavBtn').style.display = 'none'; document.getElementById('topAdminBtn').style.display = 'none';
   }
 }
 
-// UPDATEUI ANTI-CRASH SÉCURISÉ AVEC SAFESETTEXT
-function updateUI() {
-  if (!currentUser) return;
-  safeSetText('navPoints', (currentUser.points || 0) + ' pts');
-  
-  const navAv = document.getElementById('navAvatar');
-  if (navAv) {
-    if (currentUser.avatar) { navAv.textContent = ''; navAv.style.backgroundImage = `url('${currentUser.avatar}')`; navAv.style.backgroundSize = 'cover'; } 
-    else { navAv.style.backgroundImage = 'none'; navAv.textContent = (currentUser.username || 'A')[0].toUpperCase(); }
-  }
-  
-  const st = getUserStats(currentUser);
-  safeSetText('welcomeMsg', 'Bienvenue, ' + currentUser.username + ' ! 👋');
-  safeSetText('statPoints', currentUser.points || 0);
-  safeSetText('statPredictions', st.total);
-  safeSetText('statExact', st.exact);
-  
-  const sorted = getSorted();
-  const rankIdx = sorted.findIndex(u => u.id === currentUser.id);
-  const rankStr = rankIdx >= 0 ? '#' + (rankIdx + 1) : '#1';
-  safeSetText('statRank', rankStr);
-  
-  safeSetText('profileUsername', currentUser.username || '-');
-  safeSetText('profileEmail', currentUser.email || '-');
-  safeSetText('profileRole', currentUser.role === 'admin' ? '⭐ Administrateur' : '🎮 Joueur');
-  safeSetText('profilePoints', currentUser.points || 0);
-  safeSetText('profileRank', rankStr);
-
-  const profAv = document.getElementById('profileBigAvatar');
-  if (profAv) {
-    if (currentUser.avatar) { profAv.textContent = ''; profAv.style.backgroundImage = `url('${currentUser.avatar}')`; profAv.style.backgroundSize = 'cover'; } 
-    else { profAv.style.backgroundImage = 'none'; profAv.textContent = (currentUser.username || 'A')[0].toUpperCase(); }
-  }
-
-  if (sorted[0]) {
-    safeSetText('kingUsername', sorted[0].username + (sorted[0].role === 'admin' ? ' ⭐' : ''));
-    safeSetText('kingPoints', sorted[0].points + ' pts');
-  }
-}
-
+// ==========================================
+// AUTHENTIFICATION
+// ==========================================
 function switchAuth(tab) {
   document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
   document.getElementById('authError').style.display = 'none';
@@ -278,6 +265,92 @@ async function handleRegister(e) {
 function handleLogout() { localStorage.removeItem('pf_cloud_session'); currentUser = null; location.reload(); }
 function togglePassword(id) { const input = document.getElementById(id); input.type = input.type === "password" ? "text" : "password"; }
 
+// SECRETS ADMIN
+let secretClicks = 0;
+function secretAdminUnlock() {
+  secretClicks++;
+  if (secretClicks >= 5 && currentUser) {
+    currentUser.role = 'admin';
+    const idx = appState.users.findIndex(u => u.id === currentUser.id);
+    if (idx !== -1) appState.users[idx].role = 'admin';
+    localStorage.setItem('pf_cloud_session', JSON.stringify(currentUser));
+    if (firestore) firestore.collection('users').doc(currentUser.id).update({ role: 'admin' });
+    alert('🔓 PASS VIP ADMIN ACTIVÉ !');
+    setupApp(); secretClicks = 0;
+  }
+}
+
+// ==========================================
+// INTERFACE UTILISATEUR & CLASSEMENTS
+// ==========================================
+function updateUI() {
+  if (!currentUser) return;
+  safeSetText('navPoints', (currentUser.points || 0) + ' pts');
+  
+  const navAv = document.getElementById('navAvatar');
+  if (navAv) {
+    if (currentUser.avatar) { navAv.textContent = ''; navAv.style.backgroundImage = `url('${currentUser.avatar}')`; navAv.style.backgroundSize = 'cover'; } 
+    else { navAv.style.backgroundImage = 'none'; navAv.textContent = (currentUser.username || 'A')[0].toUpperCase(); navAv.style.background = getAvatarColor(currentUser.username); }
+  }
+  
+  const st = getUserStats(currentUser);
+  safeSetText('welcomeMsg', 'Bienvenue, ' + currentUser.username + ' ! 👋');
+  safeSetText('statPoints', currentUser.points || 0);
+  safeSetText('statPredictions', st.total);
+  safeSetText('statExact', st.exact);
+  
+  const sorted = getSorted();
+  const rankIdx = sorted.findIndex(u => u.id === currentUser.id);
+  const rankStr = rankIdx >= 0 ? '#' + (rankIdx + 1) : '#1';
+  safeSetText('statRank', rankStr);
+  
+  safeSetText('profileUsername', currentUser.username || '-');
+  safeSetText('profileEmail', currentUser.email || '-');
+  safeSetText('profileRole', currentUser.role === 'admin' ? '⭐ Administrateur' : '🎮 Joueur');
+  safeSetText('profilePoints', currentUser.points || 0);
+  safeSetText('profileRank', rankStr);
+
+  const profAv = document.getElementById('profileBigAvatar');
+  if (profAv) {
+    if (currentUser.avatar) { profAv.textContent = ''; profAv.style.backgroundImage = `url('${currentUser.avatar}')`; profAv.style.backgroundSize = 'cover'; } 
+    else { profAv.style.backgroundImage = 'none'; profAv.textContent = (currentUser.username || 'A')[0].toUpperCase(); }
+  }
+
+  if (sorted[0]) {
+    safeSetText('kingUsername', sorted[0].username + (sorted[0].role === 'admin' ? ' ⭐' : ''));
+    safeSetText('kingPoints', sorted[0].points + ' pts');
+  }
+}
+
+function renderDashboardLeaderboard() {
+  const sorted = getSorted(); const max = sorted[0]?.points || 1; let html = '';
+  sorted.slice(0, 5).forEach((u, i) => {
+    const isMe = currentUser && u.id === currentUser.id;
+    const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':'';
+    const pct = max > 0 ? Math.round((u.points / max) * 100) : 0;
+    const av = u.avatar ? `<div style="width:32px;height:32px;border-radius:50%;background-image:url('${u.avatar}');background-size:cover;background-position:center;border:1px solid var(--border)"></div>` : `<div style="width:32px;height:32px;border-radius:50%;background:${getAvatarColor(u.username)};display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:0.8rem">${u.username[0].toUpperCase()}</div>`;
+    html += `<div style="display:flex;align-items:center;gap:10px;padding:10px;background:${isMe?'rgba(0,230,118,0.1)':'var(--bg-card)'};border:1px solid ${isMe?'var(--accent)':'var(--border)'};border-radius:8px;margin-bottom:6px"><span style="font-weight:800;min-width:30px;color:${i<3?'var(--gold)':'var(--text-muted)'}">${medal||'#'+(i+1)}</span>${av}<div style="flex:1"><div style="font-weight:700;font-size:0.9rem">${u.username} ${u.role==='admin'?'⭐':''}</div><div style="height:4px;background:var(--bg-body);border-radius:2px;margin-top:4px"><div style="height:100%;width:${pct}%;background:var(--accent);border-radius:2px"></div></div></div><span style="font-weight:800;color:var(--gold)">${u.points} pts</span></div>`;
+  });
+  document.getElementById('dashboardLeaderboard').innerHTML = html;
+}
+
+function renderLeaderboard() {
+  const sorted = getSorted();
+  let html = '<table class="leaderboard-table"><thead><tr><th>#</th><th>Joueur</th><th>Pronos</th><th>✅ Exact</th><th>🎯 Bon</th><th>Points</th></tr></thead><tbody>';
+  sorted.forEach((u, i) => {
+    const isMe = currentUser && u.id === currentUser.id;
+    const st = getUserStats(u);
+    const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':'#'+(i+1);
+    const av = u.avatar ? `<div style="width:26px;height:26px;border-radius:50%;background-image:url('${u.avatar}');background-size:cover;background-position:center;border:1px solid var(--border)"></div>` : `<div style="width:26px;height:26px;border-radius:50%;background:${getAvatarColor(u.username)};display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:0.7rem">${u.username[0].toUpperCase()}</div>`;
+    html += `<tr class="${isMe?'current-user':''}"><td>${medal}</td><td><div style="display:flex;align-items:center;gap:8px">${av}<strong>${u.username}</strong> ${u.role==='admin'?'⭐':''}</div></td><td>${st.total}</td><td style="color:var(--gold);font-weight:bold">${st.exact}</td><td style="color:var(--green);font-weight:bold">${st.correct}</td><td style="font-size:1.1rem;font-weight:800">${u.points} pts</td></tr>`;
+  });
+  html += '</tbody></table>';
+  document.getElementById('leaderboardContainer').innerHTML = html;
+}
+
+// ==========================================
+// MATCHS & PRONOSTICS
+// ==========================================
 function setupMonthFilter() {
   const d = new Date(); currentMonth = (d.getMonth() + 1).toString().padStart(2, '0');
   const bar = document.getElementById('monthFilterBar'); if (!bar) return;
@@ -286,15 +359,20 @@ function setupMonthFilter() {
 }
 function filterByMonth(m) { currentMonth = m; document.querySelectorAll('#monthFilterBar .matchday-pill').forEach(b => b.classList.remove('active')); if (event && event.target) event.target.classList.add('active'); renderMatches(); }
 function filterLeague(l) { currentLeague = l; applyTheme(); document.querySelectorAll('#page-matches .league-tab').forEach(t => t.classList.remove('active')); if (event && event.target) event.target.classList.add('active'); renderMatches(); }
-function switchMatchView(viewMode) { currentMatchView = viewMode; document.getElementById('btnTabUpcoming').className = viewMode === 'upcoming' ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-secondary'; document.getElementById('btnTabFinished').className = viewMode === 'finished' ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-secondary'; renderMatches(); }
 
 function toggleMatchPredictions(matchId, matchDateStr) {
-  const el = document.getElementById('all_preds_' + matchId); if (!el) return;
+  const el = document.getElementById('all_preds_' + matchId);
+  if (!el) return;
+
   const started = hasMatchStarted(matchDateStr, "20:00");
   const isAdmin = (currentUser && currentUser.role === 'admin');
 
   if (el.style.display === 'none') {
-    if (!started && !isAdmin) { alert("🔒 Anti-Triche : Les pronostics de vos amis seront visibles dès le coup d'envoi du match !"); return; }
+    if (!started && !isAdmin) {
+      alert("🔒 Anti-Triche : Les pronostics des autres joueurs seront dévoilés au coup d'envoi du match !");
+      return;
+    }
+
     const score = appState.scores[matchId];
     let html = '<div style="font-weight:bold;color:var(--gold);margin-bottom:8px;border-bottom:1px solid var(--border);padding-bottom:4px">👥 Pronostics des joueurs :</div>';
     let count = 0;
@@ -313,14 +391,11 @@ function toggleMatchPredictions(matchId, matchDateStr) {
 }
 
 function renderMatches() {
-  const container = document.getElementById('matchesContainer'); if (!container) return;
+  const container = document.getElementById('matchesContainer');
   let list = ALL_MATCHES;
   if (currentLeague !== 'all') list = list.filter(m => m.league === currentLeague);
   if (currentMonth !== 'all') { list = list.filter(m => { const parts = m.date.split('/'); return parts.length === 3 && parts[1] === currentMonth; }); }
-  if (currentMatchView === 'upcoming') { list = list.filter(m => !appState.scores[m.id] || appState.scores[m.id].status === 'LIVE'); } 
-  else { list = list.filter(m => appState.scores[m.id] && appState.scores[m.id].status !== 'LIVE'); }
-
-  if (list.length === 0) { container.innerHTML = '<p style="text-align:center;color:var(--text-muted);padding:40px">Aucun match trouvé.</p>'; return; }
+  if (list.length === 0) { container.innerHTML = '<p style="text-align:center;color:var(--text-muted);padding:40px">Aucun match trouvé pour ce filtre.</p>'; return; }
 
   let html = '';
   list.forEach(m => {
@@ -331,23 +406,19 @@ function renderMatches() {
     const li = LEAGUE_INFO[m.league] || { name:m.league, flag:'⚽' };
     let totalPreds = 0; appState.users.forEach(u => { if (u.preds && u.preds[m.id] && u.preds[m.id].h !== '') totalPreds++; });
 
-    let statusBadgeHtml = `<span class="status-badge status-upcoming">⏳ 20:00</span>`;
-    if (score && score.status === 'LIVE') statusBadgeHtml = `<span class="status-badge status-live">🔴 LIVE ${score.elapsed || 45}'</span>`;
-    else if (done) statusBadgeHtml = `<span class="status-badge status-finished">✅ TERMINÉ</span>`;
-
     let res = '';
-    if (done && score) {
+    if (done) {
       const pts = calcPts(pred, score);
       const cls = pts===5?'pts-exact':pts===3?'pts-correct':'pts-wrong';
       const lbl = pts===5?'🎯 Score Exact (+5 pts)':pts===3?'✅ Bon Vainqueur (+3 pts)':'❌ Incorrect (0 pt)';
       res = `<div class="match-result-badge ${cls}">Score Final : ${score.h} - ${score.a} | ${lbl}</div>`;
     }
 
-    const disableInput = (done) ? 'disabled' : '';
+    const disableInput = (started || done) ? 'disabled' : '';
 
     html += `
       <div class="match-card ${done?'finished':''}">
-        <div class="match-header"><span>${li.flag} <strong>${li.name}</strong></span><div>${statusBadgeHtml} <span style="color:var(--gold);margin-left:8px">📅 ${m.date}</span></div></div>
+        <div class="match-header"><span>${li.flag} <strong>${li.name}</strong></span><span style="color:var(--gold)">📅 ${m.date}</span></div>
         <div class="match-teams">
           <div class="match-team home"><span>${m.home}</span><img src="${getTeamCrest(m.home)}" class="team-crest"></div>
           <div class="match-vs">${done ? score.h + ' - ' + score.a : 'VS'}</div>
@@ -372,6 +443,9 @@ async function saveAll() {
   if (!currentUser) return;
   if (!currentUser.preds) currentUser.preds = {};
   let count = 0;
+  const btn = document.getElementById('btnSavePronos');
+  if(btn) { btn.innerHTML = "⏳ Sauvegarde..."; btn.disabled = true; }
+
   document.querySelectorAll('.match-prediction input').forEach(input => {
     if (!input.disabled) {
       const id = input.id.substring(2);
@@ -381,65 +455,89 @@ async function saveAll() {
     }
   });
 
+  const idx = appState.users.findIndex(u => u.id === currentUser.id);
+  if (idx !== -1) appState.users[idx] = currentUser;
+
   if (firestore) { try { await firestore.collection('users').doc(currentUser.id).update({ preds: currentUser.preds }); } catch (err) {} }
   localStorage.setItem('pf_cloud_session', JSON.stringify(currentUser));
-  recalculateAllCloudPoints(); updateUI(); renderMatches(); renderLeaderboard(); renderDashboardLeaderboard(); renderMyPredictions();
-  alert(`${count} pronostics enregistrés ! ☁️✅`);
+  recalculateAllCloudPoints(); updateUI(); renderMatches(); renderLeaderboard(); renderDashboardLeaderboard();
+  
+  if(btn) { btn.innerHTML = "✅ "+count+" Sauvegardés"; btn.disabled = false; setTimeout(()=>{btn.innerHTML="💾 Sauvegarder Pronos";}, 2000); }
 }
 
-function renderMyPredictions() {
-  const container = document.getElementById('myPredictionsList');
-  if (!container || !currentUser) return;
-  let html = '', count = 0;
-  for (const [id, pred] of Object.entries(currentUser.preds || {})) {
-    const match = ALL_MATCHES.find(m => m.id === id);
-    if (!match) continue;
-    count++;
-    const score = appState.scores[id];
-    let statusText = `<span style="color:var(--gold)">⏳ En attente</span>`;
-    if (score && score.status !== 'LIVE') {
-      const pts = calcPts(pred, score);
-      statusText = `<span class="${pts===5?'pts-exact':pts===3?'pts-correct':'pts-wrong'}">Final: ${score.h}-${score.a} (+${pts} pts)</span>`;
-    }
-    html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:0.85rem"><div style="flex:1"><strong>${match.home}</strong> vs <strong>${match.away}</strong></div><div style="background:var(--bg-body);padding:2px 8px;border-radius:4px;font-weight:bold;margin:0 10px">${pred.h} - ${pred.a}</div><div style="min-width:120px;text-align:right">${statusText}</div></div>`;
+// ==========================================
+// TOUTES LES FONCTIONS DE L'ADMINISTRATEUR
+// ==========================================
+async function saveAndSyncApiSports() {
+  const btn = document.getElementById('btnSyncApi');
+  if(btn) { btn.innerHTML = "⏳ Recherche des scores..."; btn.disabled = true; }
+  try {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const res = await fetch(`https://v3.football.api-sports.io/fixtures?date=${todayStr}`, { method: "GET", headers: { "x-apisports-key": REAL_API_KEY } });
+    const data = await res.json();
+    const fixtures = data.response || [];
+    let count = 0;
+    fixtures.forEach(f => {
+      const status = f.fixture.status.short;
+      const hName = f.teams.home.name.toLowerCase();
+      const aName = f.teams.away.name.toLowerCase();
+      const match = ALL_MATCHES.find(m => m.home.toLowerCase().includes(hName) || m.away.toLowerCase().includes(aName));
+      if (match) {
+        if (['1H','HT','2H','ET','P','LIVE'].includes(status)) { appState.scores[match.id] = { h: f.goals.home, a: f.goals.away, status: 'LIVE', elapsed: f.fixture.status.elapsed }; count++; } 
+        else if (['FT','AET','PEN'].includes(status)) { appState.scores[match.id] = { h: f.goals.home, a: f.goals.away, status: 'FINISHED' }; count++; }
+      }
+    });
+    if (firestore) { await firestore.collection('settings').doc('global').set({ scores: appState.scores }, { merge: true }); }
+    recalculateAllCloudPoints(); updateUI(); renderMatches(); renderLeaderboard(); renderDashboardLeaderboard(); renderAdminMatchList();
+    if(btn) { btn.innerHTML = "⚡ Synchro Vrais Scores"; btn.disabled = false; }
+    alert(`✅ ${count} match(s) actualisé(s) depuis l'API Sports !`);
+  } catch (err) {
+    if(btn) { btn.innerHTML = "⚡ Synchro Vrais Scores"; btn.disabled = false; }
+    alert("❌ Erreur API : " + err.message);
   }
-  if (count === 0) html = '<p style="text-align:center;color:var(--text-muted)">Vous n\'avez fait aucun pronostic.</p>';
-  container.innerHTML = html;
 }
 
-function renderDashboardLeaderboard() {
-  const container = document.getElementById('dashboardLeaderboard'); if (!container) return;
-  const sorted = getSorted(); const max = sorted[0]?.points || 1; let html = '';
-  sorted.slice(0, 5).forEach((u, i) => {
-    const isMe = currentUser && u.id === currentUser.id;
-    const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':'';
-    const pct = max > 0 ? Math.round((u.points / max) * 100) : 0;
-    html += `<div style="display:flex;align-items:center;gap:10px;padding:10px;background:${isMe?'rgba(0,230,118,0.1)':'var(--bg-card)'};border:1px solid ${isMe?'var(--accent)':'var(--border)'};border-radius:8px;margin-bottom:6px"><span style="font-weight:800;min-width:30px;color:${i<3?'var(--gold)':'var(--text-muted)'}">${medal||'#'+(i+1)}</span><div style="flex:1"><div style="font-weight:700;font-size:0.9rem">${u.username} ${u.role==='admin'?'⭐':''}</div><div style="height:4px;background:var(--bg-body);border-radius:2px;margin-top:4px"><div style="height:100%;width:${pct}%;background:var(--accent);border-radius:2px"></div></div></div><span style="font-weight:800;color:var(--gold)">${u.points} pts</span></div>`;
-  });
-  container.innerHTML = html;
+function adminSimulateLiveMatch() {
+  ALL_MATCHES.slice(0, 3).forEach(m => { appState.scores[m.id] = { h: Math.floor(Math.random() * 3), a: Math.floor(Math.random() * 2), status: 'LIVE', elapsed: Math.floor(Math.random() * 70) + 15 }; });
+  if (firestore) firestore.collection('settings').doc('global').set({ scores: appState.scores }, { merge: true });
+  recalculateAllCloudPoints(); updateUI(); renderMatches(); renderLeaderboard(); renderDashboardLeaderboard(); renderAdminMatchList();
+  alert("🔴 3 Matchs sont passés EN DIRECT !");
 }
 
-function renderLeaderboard() {
-  const container = document.getElementById('leaderboardContainer'); if (!container) return;
-  const sorted = getSorted();
-  let html = '<table class="leaderboard-table"><thead><tr><th>#</th><th>Joueur</th><th>Pronos</th><th>✅ Exact</th><th>🎯 Bon</th><th>Points</th></tr></thead><tbody>';
-  sorted.forEach((u, i) => {
-    const isMe = currentUser && u.id === currentUser.id;
-    const st = getUserStats(u);
-    const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':'#'+(i+1);
-    html += `<tr class="${isMe?'current-user':''}"><td>${medal}</td><td><strong>${u.username}</strong> ${u.role==='admin'?'⭐':''}</td><td>${st.total}</td><td style="color:var(--gold);font-weight:bold">${st.exact}</td><td style="color:var(--green);font-weight:bold">${st.correct}</td><td style="font-size:1.1rem;font-weight:800">${u.points} pts</td></tr>`;
-  });
-  html += '</tbody></table>';
-  container.innerHTML = html;
+function adminSimulateScores() {
+  ALL_MATCHES.filter(m => !appState.scores[m.id]).slice(0, 10).forEach(m => { appState.scores[m.id] = { h: Math.floor(Math.random()*4), a: Math.floor(Math.random()*3), status: 'FINISHED' }; });
+  if (firestore) firestore.collection('settings').doc('global').set({ scores: appState.scores }, { merge: true });
+  recalculateAllCloudPoints(); updateUI(); renderMatches(); renderLeaderboard(); renderDashboardLeaderboard(); renderAdminMatchList();
+  alert("10 scores simulés !");
+}
+
+function adminSimulateAll() {
+  if (!confirm('Simuler TOUS les matchs ?')) return;
+  ALL_MATCHES.forEach(m => { if (!appState.scores[m.id]) appState.scores[m.id] = { h: Math.floor(Math.random()*4), a: Math.floor(Math.random()*3), status: 'FINISHED' }; });
+  if (firestore) firestore.collection('settings').doc('global').set({ scores: appState.scores }, { merge: true });
+  recalculateAllCloudPoints(); updateUI(); renderMatches(); renderLeaderboard(); renderDashboardLeaderboard(); renderAdminMatchList();
+}
+
+function adminResetScores() {
+  if (!confirm('Supprimer tous les scores enregistrés ?')) return;
+  appState.scores = {};
+  if (firestore) firestore.collection('settings').doc('global').set({ scores: {} }, { merge: true });
+  recalculateAllCloudPoints(); updateUI(); renderMatches(); renderLeaderboard(); renderDashboardLeaderboard(); renderAdminMatchList();
 }
 
 function renderAdminMatchList() {
+  const container = document.getElementById('adminMatchList');
+  if (!container) return;
+  const searchVal = (document.getElementById('adminSearchInput')?.value || '').toLowerCase();
+  let list = ALL_MATCHES;
+  if (searchVal) list = list.filter(m => m.home.toLowerCase().includes(searchVal) || m.away.toLowerCase().includes(searchVal));
+
   let html = '';
-  ALL_MATCHES.slice(0, 50).forEach(m => {
+  list.slice(0, 100).forEach(m => {
     const s = appState.scores[m.id];
-    html += `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);flex-wrap:wrap"><span style="font-size:0.75rem;color:var(--text-dim);min-width:70px">${m.date}</span><span style="flex:1;font-size:0.85rem;min-width:140px">${m.home} vs ${m.away}</span><input type="number" min="0" max="15" value="${s?s.h:''}" id="ah_${m.id}" placeholder="H" style="width:38px;padding:5px;text-align:center;background:var(--bg-body);color:white;border-radius:4px"><span>-</span><input type="number" min="0" max="15" value="${s?s.a:''}" id="aa_${m.id}" placeholder="A" style="width:38px;padding:5px;text-align:center;background:var(--bg-body);color:white;border-radius:4px"><button class="btn btn-primary btn-xs" onclick="adminSaveScore('${m.id}')">Valider</button></div>`;
+    html += `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);flex-wrap:wrap"><span style="font-size:0.75rem;color:var(--text-dim);min-width:70px">${m.date}</span><span style="flex:1;font-size:0.85rem;min-width:140px"><strong>${m.home}</strong> vs <strong>${m.away}</strong></span><input type="number" min="0" max="15" value="${s?s.h:''}" id="ah_${m.id}" placeholder="H" style="width:38px;padding:5px;text-align:center;background:var(--bg-body);color:white;border-radius:4px"><span>-</span><input type="number" min="0" max="15" value="${s?s.a:''}" id="aa_${m.id}" placeholder="A" style="width:38px;padding:5px;text-align:center;background:var(--bg-body);color:white;border-radius:4px"><button class="btn btn-primary btn-xs" onclick="adminSaveScore('${m.id}')">Valider</button></div>`;
   });
-  const el = document.getElementById('adminMatchList'); if(el) el.innerHTML = html;
+  container.innerHTML = html;
 }
 
 async function adminSaveScore(id) {
@@ -448,9 +546,83 @@ async function adminSaveScore(id) {
   if (isNaN(h) || isNaN(a)) { alert('Entrez les 2 scores !'); return; }
   appState.scores[id] = { h, a, status: 'FINISHED' };
   if (firestore) { try { await firestore.collection('settings').doc('global').set({ scores: appState.scores }, { merge: true }); } catch (e) {} }
-  recalculateAllCloudPoints(); updateUI(); renderMatches(); renderLeaderboard(); renderDashboardLeaderboard(); renderAdminMatchList();
-  alert('Score enregistré !');
+  recalculateAllCloudPoints(); updateUI(); renderMatches(); renderLeaderboard(); renderDashboardLeaderboard(); renderAdminMatchList(); renderAdminStats();
+  alert('Score enregistré ! ⚡');
 }
+
+function uploadAuthBgFromFile(event) {
+  compressImage(event.target.files[0], 800, 0.4, async d => { appState.settings.authBgImage = d; applyTheme(); if (firestore) { try { await firestore.collection('settings').doc('global').set({ authBgImage: d }, { merge: true }); } catch (err) {} } alert("✅ Fond de connexion mis à jour !"); });
+}
+function uploadDashboardBgFromFile(event) {
+  compressImage(event.target.files[0], 800, 0.4, async d => { appState.settings.dashboardBgImage = d; applyTheme(); if (firestore) { try { await firestore.collection('settings').doc('global').set({ dashboardBgImage: d }, { merge: true }); } catch (err) {} } alert("✅ Fond d'accueil mis à jour !"); });
+}
+
+function renderAdminLeagueBackgrounds() {
+  const container = document.getElementById('adminLeagueBackgrounds'); if (!container) return; let html = '';
+  for (const [key, li] of Object.entries(LEAGUE_INFO)) {
+    const url = (appState.settings.leagueBackgrounds && appState.settings.leagueBackgrounds[key]) || '';
+    html += `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);flex-wrap:wrap"><span style="min-width:140px;font-weight:600">${li.flag} ${li.name}</span><label class="btn btn-secondary btn-sm" style="cursor:pointer">📸 Changer fond<input type="file" accept="image/*" style="display:none" onchange="uploadAdminLeagueImage(event, 'leagueBackgrounds', '${key}')"></label>${url ? `<img src="${url}" style="width:70px;height:40px;object-fit:cover;border-radius:4px">` : ''}</div>`;
+  }
+  container.innerHTML = html;
+}
+
+function renderAdminLeagueBanners() {
+  const container = document.getElementById('adminLeagueBanners'); if (!container) return; let html = '';
+  for (const [key, li] of Object.entries(LEAGUE_INFO)) {
+    const url = (appState.settings.leagueBanners && appState.settings.leagueBanners[key]) || '';
+    html += `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);flex-wrap:wrap"><span style="min-width:140px;font-weight:600">${li.flag} ${li.name}</span><label class="btn btn-secondary btn-sm" style="cursor:pointer">📸 Changer bannière<input type="file" accept="image/*" style="display:none" onchange="uploadAdminLeagueImage(event, 'leagueBanners', '${key}')"></label>${url ? `<img src="${url}" style="width:70px;height:40px;object-fit:cover;border-radius:4px">` : ''}</div>`;
+  }
+  container.innerHTML = html;
+}
+
+function uploadAdminLeagueImage(event, type, leagueKey) {
+  compressImage(event.target.files[0], 800, 0.4, d => {
+    if (!appState.settings[type]) appState.settings[type] = {};
+    appState.settings[type][leagueKey] = d;
+    if (firestore) { firestore.collection('settings').doc('global').set({ [type]: appState.settings[type] }, { merge: true }); }
+    applyTheme(); renderAdminLeagueBackgrounds(); renderAdminLeagueBanners();
+    alert(`✅ Image de ligue mise à jour !`);
+  });
+}
+
+function adminAddMusic(event) {
+  const file = event.target.files[0];
+  if (!file || file.size > 8 * 1024 * 1024) { alert("Fichier trop grand (Max: 8 Mo)."); return; }
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    const newSong = { name: file.name.replace('.mp3', ''), src: e.target.result };
+    if (!appState.settings.playlist) appState.settings.playlist = [];
+    appState.settings.playlist.push(newSong);
+    if (firestore) { try { await firestore.collection('settings').doc('global').set({ playlist: appState.settings.playlist }, { merge: true }); } catch (err) {} }
+    setupAudioPlayer(); renderAdminPlaylist(); alert(`🎵 Musique ajoutée : ${newSong.name}`);
+  };
+  reader.readAsDataURL(file);
+}
+
+function renderAdminPlaylist() {
+  const cont = document.getElementById('adminPlaylistList');
+  if (!cont || !appState.settings.playlist) return;
+  cont.innerHTML = appState.settings.playlist.map((s, i) => `<div style="display:flex;justify-content:space-between;padding:4px;border-bottom:1px solid var(--border)"><span>${s.name}</span><button class="btn btn-xs btn-secondary" onclick="adminRemoveSong(${i})">❌</button></div>`).join('');
+}
+
+function adminRemoveSong(index) {
+  appState.settings.playlist.splice(index, 1);
+  if (firestore) firestore.collection('settings').doc('global').set({ playlist: appState.settings.playlist }, { merge: true });
+  setupAudioPlayer(); renderAdminPlaylist();
+}
+
+function renderAdminStats() {
+  const el = document.getElementById('adminStats'); if (!el) return;
+  const t = ALL_MATCHES.length; const s = Object.keys(appState.scores).length; const p = appState.users.reduce((a, u) => a + Object.keys(u.preds || {}).length, 0);
+  el.innerHTML = `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)"><span>Matchs 2026-27</span><strong>${t}</strong></div><div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)"><span>Scores validés</span><strong style="color:var(--green)">${s}</strong></div><div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)"><span>Joueurs inscrits</span><strong>${appState.users.length}</strong></div><div style="display:flex;justify-content:space-between;padding:6px 0"><span>Pronostics totaux sur le site</span><strong style="color:var(--gold);font-size:1.2rem">${p}</strong></div>`;
+}
+
+function adminPublishAnnouncement() {
+  const t = document.getElementById('adminAnnounceInput')?.value.trim(); if (!t) return;
+  appState.settings.announce = t; if (firestore) firestore.collection('settings').doc('global').set({ announce: t }, { merge: true });
+  alert('Annonce publiée ! 📢');
+}
+function changeTheme(c) { appState.settings.themeColor = c; if (firestore) firestore.collection('settings').doc('global').set({ themeColor: c }, { merge: true }); applyTheme(); }
 
 function navigateTo(p) {
   if (p === 'admin') { if (!currentUser || currentUser.role !== 'admin') { alert("⛔ Accès refusé ! Réservé à l'administrateur."); return; } }
@@ -461,6 +633,7 @@ function navigateTo(p) {
   if (page) page.classList.add('active');
   const btn = document.querySelector(`[onclick="navigateTo('${p}')"]`);
   if (btn) btn.classList.add('active');
+  if (p === 'admin') { renderAdminMatchList(); renderAdminLeagueBackgrounds(); renderAdminLeagueBanners(); renderAdminPlaylist(); renderAdminStats(); }
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
