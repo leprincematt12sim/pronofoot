@@ -38,12 +38,12 @@ const TEAM_CRESTS = {
 };
 
 const LEAGUE_INFO = {
-  champions:{ name:'Ligue des Champions', flag:'🏆', accent:'#f5c518', defaultBanner:'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=1200&q=80', defaultBg:'https://images.unsplash.com/photo-1518091043644-c1d4457512c6?auto=format&fit=crop&w=1920&q=80' },
-  premier:{ name:'Premier League', flag:'🏴󠁧󠁢󠁥󠁮󠁧󠁿', accent:'#3d195b', defaultBanner:'https://images.unsplash.com/photo-1522778119026-d647f0596c20?auto=format&fit=crop&w=1200&q=80', defaultBg:'https://images.unsplash.com/photo-1522778119026-d647f0596c20?auto=format&fit=crop&w=1920&q=80' },
-  laliga:{ name:'La Liga', flag:'🇪🇸', accent:'#ee8707', defaultBanner:'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1200&q=80', defaultBg:'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1920&q=80' },
-  seriea:{ name:'Serie A', flag:'🇮🇹', accent:'#024494', defaultBanner:'https://images.unsplash.com/photo-1510566337590-2fc1f21d0faa?auto=format&fit=crop&w=1200&q=80', defaultBg:'https://images.unsplash.com/photo-1510566337590-2fc1f21d0faa?auto=format&fit=crop&w=1920&q=80' },
-  bundesliga:{ name:'Bundesliga', flag:'🇩🇪', accent:'#d20515', defaultBanner:'https://images.unsplash.com/photo-1489944445391-11dd35572130?auto=format&fit=crop&w=1200&q=80', defaultBg:'https://images.unsplash.com/photo-1489944445391-11dd35572130?auto=format&fit=crop&w=1920&q=80' },
-  ligue1:{ name:'Ligue 1', flag:'🇫🇷', accent:'#091c3e', defaultBanner:'https://images.unsplash.com/photo-1517466787929-bc90951d0974?auto=format&fit=crop&w=1200&q=80', defaultBg:'https://images.unsplash.com/photo-1517466787929-bc90951d0974?auto=format&fit=crop&w=1920&q=80' }
+  champions:{ name:'Ligue des Champions', flag:'🏆', accent:'#f5c518', defaultBg:'https://images.unsplash.com/photo-1518091043644-c1d4457512c6?auto=format&fit=crop&w=1920&q=80' },
+  premier:{ name:'Premier League', flag:'🏴󠁧󠁢󠁥󠁮󠁧󠁿', accent:'#3d195b', defaultBg:'https://images.unsplash.com/photo-1522778119026-d647f0596c20?auto=format&fit=crop&w=1920&q=80' },
+  laliga:{ name:'La Liga', flag:'🇪🇸', accent:'#ee8707', defaultBg:'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1920&q=80' },
+  seriea:{ name:'Serie A', flag:'🇮🇹', accent:'#024494', defaultBg:'https://images.unsplash.com/photo-1510566337590-2fc1f21d0faa?auto=format&fit=crop&w=1920&q=80' },
+  bundesliga:{ name:'Bundesliga', flag:'🇩🇪', accent:'#d20515', defaultBg:'https://images.unsplash.com/photo-1489944445391-11dd35572130?auto=format&fit=crop&w=1920&q=80' },
+  ligue1:{ name:'Ligue 1', flag:'🇫🇷', accent:'#091c3e', defaultBg:'https://images.unsplash.com/photo-1517466787929-bc90951d0974?auto=format&fit=crop&w=1920&q=80' }
 };
 
 const AVATAR_COLORS = ['#00E676','#00b894','#6c5ce7','#f5c518','#0984e3','#e17055','#00cec9'];
@@ -58,28 +58,29 @@ let appState = {
 let currentUser = JSON.parse(localStorage.getItem('pf_cloud_session')) || null;
 let currentLeague = 'all';
 let currentMonth = 'all';
-let currentMatchView = 'upcoming'; // 'upcoming' (À venir & Live) ou 'finished' (Terminés)
+let currentMatchView = 'upcoming';
 
 function getTeamCrest(name) { return TEAM_CRESTS[name] || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=1a1a1c&color=fff&size=64&bold=true`; }
 
-// VERROUILLAGE STRICT AU COUP D'ENVOI (DATE + HEURE MINUTE PAR MINUTE)
-function parseMatchDateTime(dateStr, timeStr = "20:00") {
+// HEURES OFFICIELLES RATIONNELLES (15:00, 17:30, 21:00)
+function getMatchTime(matchId) {
+  const times = ["15:00", "17:30", "20:45", "21:00"];
+  const charCode = matchId.charCodeAt(matchId.length - 1) || 0;
+  return times[charCode % times.length];
+}
+
+function parseMatchDateTime(dateStr, timeStr) {
   if (!dateStr) return new Date(2099, 0, 1);
-  let d = 1, m = 1, y = 2026;
+  let d = 1, m = 8, y = 2026;
   if (dateStr.includes('/')) {
     const parts = dateStr.split('/');
     d = parseInt(parts[0]); m = parseInt(parts[1]); y = parseInt(parts[2]);
-  } else if (dateStr.includes('-')) {
-    const parts = dateStr.split('-');
-    y = parseInt(parts[0]); m = parseInt(parts[1]); d = parseInt(parts[2]);
   }
-  
-  let hours = 20, minutes = 0;
+  let hours = 21, minutes = 0;
   if (timeStr && timeStr.includes(':')) {
     const tParts = timeStr.split(':');
     hours = parseInt(tParts[0]); minutes = parseInt(tParts[1]);
   }
-
   return new Date(y, m - 1, d, hours, minutes, 0);
 }
 
@@ -88,109 +89,29 @@ function hasMatchStarted(dateStr, timeStr) {
   return new Date() >= matchTime;
 }
 
-// COMPRESSION CANVAS
-function compressImage(file, maxWidth, quality, callback) {
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    const img = new Image();
-    img.onload = function() {
-      const canvas = document.createElement('canvas');
-      let width = img.width, height = img.height;
-      if (width > maxWidth) { height = Math.round((height * maxWidth) / width); width = maxWidth; }
-      canvas.width = width; canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, width, height);
-      callback(canvas.toDataURL('image/jpeg', quality));
+// SIMULATEUR TESTEUR EN DIRECT (MODE LIVE POUR L'ADMIN)
+function adminSimulateLiveMatch() {
+  const upcoming = ALL_MATCHES.slice(0, 3);
+  upcoming.forEach(m => {
+    appState.scores[m.id] = {
+      h: Math.floor(Math.random() * 3),
+      a: Math.floor(Math.random() * 2),
+      status: 'LIVE',
+      elapsed: Math.floor(Math.random() * 70) + 15
     };
-    img.src = e.target.result;
-  };
-  reader.readAsDataURL(file);
-}
-
-async function uploadUserAvatar(event) {
-  const file = event.target.files[0];
-  if (!file || !currentUser) return;
-  compressImage(file, 150, 0.5, async function(dataUrl) {
-    currentUser.avatar = dataUrl;
-    const idx = appState.users.findIndex(u => u.id === currentUser.id);
-    if (idx !== -1) appState.users[idx].avatar = dataUrl;
-    localStorage.setItem('pf_cloud_session', JSON.stringify(currentUser));
-    if (firestore) { try { await firestore.collection('users').doc(currentUser.id).update({ avatar: dataUrl }); } catch (err) {} }
-    updateUI(); renderLeaderboard(); renderDashboardLeaderboard();
-    alert("✅ Photo de profil enregistrée !");
   });
-}
 
-// SYNCHRO API-SPORTS LIVE & TEMPS RÉEL
-async function saveAndSyncApiSports() {
-  const btn = document.getElementById('btnSyncApi');
-  if(btn) { btn.innerHTML = "⏳ Recherche des scores réels en cours..."; btn.disabled = true; }
-
-  try {
-    const todayStr = new Date().toISOString().split('T')[0];
-    const res = await fetch(`https://v3.football.api-sports.io/fixtures?date=${todayStr}`, {
-      method: "GET",
-      headers: { "x-apisports-key": REAL_API_KEY }
-    });
-
-    const data = await res.json();
-    const fixtures = data.response || [];
-    let count = 0;
-
-    fixtures.forEach(f => {
-      const status = f.fixture.status.short;
-      const homeName = f.teams.home.name.toLowerCase();
-      const awayName = f.teams.away.name.toLowerCase();
-
-      const match = ALL_MATCHES.find(m => m.home.toLowerCase().includes(homeName) || m.away.toLowerCase().includes(awayName));
-
-      if (match) {
-        if (['1H','HT','2H','ET','P','LIVE'].includes(status)) {
-          // MATCH EN DIRECT
-          appState.scores[match.id] = { h: f.goals.home, a: f.goals.away, status: 'LIVE', elapsed: f.fixture.status.elapsed };
-          count++;
-        } else if (['FT','AET','PEN'].includes(status)) {
-          // MATCH TERMINÉ
-          appState.scores[match.id] = { h: f.goals.home, a: f.goals.away, status: 'FINISHED' };
-          count++;
-        }
-      }
-    });
-
-    localStorage.setItem('pf_scores_v3', JSON.stringify(appState.scores));
-    if (firestore) { await firestore.collection('settings').doc('global').set({ scores: appState.scores }, { merge: true }); }
-
-    recalculateAllCloudPoints(); updateUI(); renderMatches(); renderLeaderboard(); renderDashboardLeaderboard();
-    if(btn) { btn.innerHTML = "⚡ Synchro Vrais Scores"; btn.disabled = false; }
-    alert(`✅ ${count} match(s) en direct ou terminé(s) actualisé(s) !`);
-  } catch (err) {
-    if(btn) { btn.innerHTML = "⚡ Synchro Vrais Scores"; btn.disabled = false; }
-    alert("❌ Erreur API : " + err.message);
+  localStorage.setItem('pf_scores_v3', JSON.stringify(appState.scores));
+  if (firestore) {
+    firestore.collection('settings').doc('global').set({ scores: appState.scores }, { merge: true });
   }
-}
 
-// LISTEN CLOUD DATA
-function listenCloudData() {
-  if (!firestore) return;
-  
-  firestore.collection('users').onSnapshot(snap => {
-    const cloudUsers = [];
-    snap.forEach(d => cloudUsers.push({ id: d.id, ...d.data() }));
-    if (cloudUsers.length > 0) appState.users = cloudUsers;
-    if (currentUser) { const u = appState.users.find(x => x.id === currentUser.id); if (u) currentUser = u; }
-    recalculateAllCloudPoints(); updateUI(); renderMatches(); renderLeaderboard(); renderDashboardLeaderboard();
-  });
-
-  firestore.collection('settings').doc('global').onSnapshot(doc => {
-    if (doc.exists) {
-      const data = doc.data();
-      appState.scores = data.scores || {};
-      appState.settings = { ...appState.settings, ...data };
-      applyTheme(); recalculateAllCloudPoints(); updateUI(); renderMatches(); renderLeaderboard(); renderDashboardLeaderboard();
-      if (currentUser && currentUser.role === 'admin') renderAdminMatchList();
-    }
-  });
+  recalculateAllCloudPoints();
+  updateUI();
+  renderMatches();
+  renderLeaderboard();
+  renderDashboardLeaderboard();
+  alert("🔴 3 Matchs sont passés EN DIRECT avec animation rouge ! Regardez l'onglet Matchs et le Classement !");
 }
 
 function calcPts(pred, score) {
@@ -219,11 +140,33 @@ function getUserStats(u) {
 }
 
 function getSorted() { return [...appState.users].sort((a,b) => b.points - a.points); }
+function getAvatarColor(u) { return AVATAR_COLORS[(u||'A').charCodeAt(0)%AVATAR_COLORS.length]; }
 
 function applyTheme() {
   document.documentElement.style.setProperty('--accent', appState.settings.themeColor || '#00E676');
   let bg = appState.settings.bgImage;
   document.documentElement.style.setProperty('--bg-image', bg ? `url('${bg}')` : 'none');
+}
+
+function listenCloudData() {
+  if (!firestore) return;
+  firestore.collection('users').onSnapshot(snap => {
+    const cloudUsers = [];
+    snap.forEach(d => cloudUsers.push({ id: d.id, ...d.data() }));
+    if (cloudUsers.length > 0) appState.users = cloudUsers;
+    if (currentUser) { const u = appState.users.find(x => x.id === currentUser.id); if (u) currentUser = u; }
+    recalculateAllCloudPoints(); updateUI(); renderMatches(); renderLeaderboard(); renderDashboardLeaderboard();
+  });
+
+  firestore.collection('settings').doc('global').onSnapshot(doc => {
+    if (doc.exists) {
+      const data = doc.data();
+      appState.scores = data.scores || {};
+      appState.settings = { ...appState.settings, ...data };
+      applyTheme(); recalculateAllCloudPoints(); updateUI(); renderMatches(); renderLeaderboard(); renderDashboardLeaderboard();
+      if (currentUser && currentUser.role === 'admin') renderAdminMatchList();
+    }
+  });
 }
 
 function init() {
@@ -317,7 +260,6 @@ async function handleRegister(e) {
 }
 
 function handleLogout() { localStorage.removeItem('pf_cloud_session'); currentUser = null; location.reload(); }
-function togglePassword(id) { const input = document.getElementById(id); input.type = input.type === "password" ? "text" : "password"; }
 
 function setupMonthFilter() {
   const d = new Date();
@@ -339,12 +281,11 @@ function switchMatchView(viewMode) {
   renderMatches();
 }
 
-// VISIONNAGE ET ANTI-TRICHE DES PRONOSTICS
-function toggleMatchPredictions(matchId, matchDateStr, timeStr) {
+function toggleMatchPredictions(matchId, matchDateStr, matchTimeStr) {
   const el = document.getElementById('all_preds_' + matchId);
   if (!el) return;
 
-  const started = hasMatchStarted(matchDateStr, timeStr);
+  const started = hasMatchStarted(matchDateStr, matchTimeStr);
   const isAdmin = (currentUser && currentUser.role === 'admin');
 
   if (el.style.display === 'none') {
@@ -370,7 +311,6 @@ function toggleMatchPredictions(matchId, matchDateStr, timeStr) {
   } else { el.style.display = 'none'; }
 }
 
-// RENDU DYNAMIQUE DES MATCHS AVEC HEURES ET BADGES EN DIRECT
 function renderMatches() {
   const container = document.getElementById('matchesContainer');
   let list = ALL_MATCHES;
@@ -378,7 +318,6 @@ function renderMatches() {
   if (currentLeague !== 'all') list = list.filter(m => m.league === currentLeague);
   if (currentMonth !== 'all') { list = list.filter(m => { const parts = m.date.split('/'); return parts.length === 3 && parts[1] === currentMonth; }); }
 
-  // Filtre Mode Vue (À venir/Live VS Terminés)
   if (currentMatchView === 'upcoming') {
     list = list.filter(m => !appState.scores[m.id] || appState.scores[m.id].status === 'LIVE');
   } else {
@@ -386,7 +325,7 @@ function renderMatches() {
   }
 
   if (list.length === 0) {
-    container.innerHTML = '<p style="text-align:center;color:var(--text-muted);padding:40px">Aucun match trouvé pour cette sélection.</p>';
+    container.innerHTML = '<p style="text-align:center;color:var(--text-muted);padding:40px">Aucun match dans cet onglet.</p>';
     return;
   }
 
@@ -394,15 +333,15 @@ function renderMatches() {
   list.forEach(m => {
     const pred = (currentUser && currentUser.preds && currentUser.preds[m.id]) || { h:'', a:'' };
     const score = appState.scores[m.id];
-    const matchTimeStr = m.time || "20:45";
+    const matchTimeStr = getMatchTime(m.id);
     const started = hasMatchStarted(m.date, matchTimeStr);
     const isLive = score && score.status === 'LIVE';
-    const isFinished = score && (score.status === 'FINISHED' || !isLive);
+    const isFinished = score && score.status === 'FINISHED';
 
     let statusBadgeHtml = `<span class="status-badge status-upcoming">⏳ ${matchTimeStr}</span>`;
     if (isLive) {
       statusBadgeHtml = `<span class="status-badge status-live">🔴 LIVE ${score.elapsed || 45}'</span>`;
-    } else if (isFinished && score) {
+    } else if (isFinished) {
       statusBadgeHtml = `<span class="status-badge status-finished">✅ TERMINÉ</span>`;
     }
 
@@ -414,8 +353,8 @@ function renderMatches() {
       res = `<div class="match-result-badge ${cls}">Score Final : ${score.h} - ${score.a} | ${lbl}</div>`;
     }
 
-    // VERROUILLAGE AUTOMATIQUE ET STRICT DE LA SAISIE AU COUP D'ENVOI
-    const disableInput = (started || isLive || (isFinished && score)) ? 'disabled' : '';
+    // VERROUILLAGE AUTOMATIQUE ST STRICT AU COUP D'ENVOI OU EN LIVE
+    const disableInput = (started || isLive || isFinished) ? 'disabled' : '';
     const lockNotice = (disableInput && !isFinished) ? '<span style="font-size:0.75rem;color:var(--danger);font-weight:bold">🔒 Pronostics Fermés</span>' : '';
 
     html += `
@@ -435,7 +374,7 @@ function renderMatches() {
         
         <div style="text-align:center;margin-bottom:6px">${lockNotice}</div>
 
-        ${(!isFinished || isLive) ? `
+        ${(!isFinished) ? `
         <div class="match-prediction">
           <input type="number" min="0" max="15" value="${pred.h}" id="h_${m.id}" placeholder="H" ${disableInput}>
           <span>:</span>
@@ -445,7 +384,7 @@ function renderMatches() {
         ${res}
         
         <div style="text-align:center;margin-top:12px;border-top:1px dashed var(--border);padding-top:8px">
-          <button class="btn btn-secondary btn-xs" onclick="toggleMatchPredictions('${m.id}', '${m.date}', '${matchTimeStr}')">👥 Voir les pronos des autres</button>
+          <button class="btn btn-secondary btn-xs" onclick="toggleMatchPredictions('${m.id}', '${m.date}', '${matchTimeStr}')">👥 Voir les pronos de tous</button>
         </div>
         <div id="all_preds_${m.id}" style="display:none;margin-top:10px;padding:10px;background:#111;border-radius:8px;border:1px solid var(--border)"></div>
       </div>`;
@@ -457,9 +396,6 @@ async function saveAll() {
   if (!currentUser) return;
   if (!currentUser.preds) currentUser.preds = {};
   let count = 0;
-  const btn = document.getElementById('btnSavePronos');
-  if(btn) { btn.innerHTML = "⏳ Sauvegarde..."; btn.disabled = true; }
-
   document.querySelectorAll('.match-prediction input').forEach(input => {
     if (!input.disabled) {
       const id = input.id.substring(2);
@@ -472,8 +408,7 @@ async function saveAll() {
   if (firestore) { try { await firestore.collection('users').doc(currentUser.id).update({ preds: currentUser.preds }); } catch (err) {} }
   localStorage.setItem('pf_cloud_session', JSON.stringify(currentUser));
   recalculateAllCloudPoints(); updateUI(); renderMatches(); renderLeaderboard(); renderDashboardLeaderboard();
-  
-  if(btn) { btn.innerHTML = "✅ "+count+" Sauvegardés"; btn.disabled = false; setTimeout(()=>{btn.innerHTML="💾 Sauvegarder Mes Pronos";}, 2000); }
+  alert(`${count} pronostics enregistrés dans le Cloud ! ☁️✅`);
 }
 
 function updateUI() {
@@ -550,7 +485,6 @@ async function adminSaveScore(id) {
 
 function navigateTo(p) {
   if (p === 'admin') { if (!currentUser || currentUser.role !== 'admin') { alert("⛔ Accès refusé ! Réservé à l'administrateur."); return; } }
-  if (p === 'dashboard') { currentLeague = 'dashboard'; applyTheme(); } else { currentLeague = 'all'; applyTheme(); }
   document.querySelectorAll('.page-section').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.bottom-nav-item').forEach(b => b.classList.remove('active'));
   const page = document.getElementById('page-' + p);
