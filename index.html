@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>PronoFoot PRO — Saison 2026-27</title>
+  <title>PronoFoot PRO — Saison 2026-27 (Live Engine)</title>
   <link rel="stylesheet" href="css/main.css">
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
@@ -13,7 +13,7 @@
 
   <audio id="siteAudioPlayer"></audio>
 
-  <!-- CONNEXION / INSCRIPTION -->
+  <!-- CONNEXION / INSCRIPTION SÉCURISÉE -->
   <div class="auth-overlay" id="authScreen" style="display:none">
     <div class="auth-card">
       <div class="auth-header">
@@ -28,7 +28,6 @@
 
       <div id="authError" style="color:var(--danger);font-size:0.85rem;margin-bottom:12px;display:none;text-align:center;font-weight:bold"></div>
 
-      <!-- Formulaire Connexion -->
       <form id="loginForm" onsubmit="handleLogin(event)">
         <div class="form-group"><label>📧 Adresse Email ou Pseudo</label><input type="text" id="loginEmail" placeholder="ton@email.com" required></div>
         <div class="form-group">
@@ -42,7 +41,6 @@
         </div>
       </form>
 
-      <!-- Formulaire Inscription -->
       <form id="registerForm" style="display:none" onsubmit="handleRegister(event)">
         <div class="form-group"><label>👤 Pseudo de joueur</label><input type="text" id="regUser" placeholder="Ex: Mathis_92" required minlength="3"></div>
         <div class="form-group"><label>📧 Adresse Email</label><input type="email" id="regEmail" placeholder="ton@email.com" required></div>
@@ -61,7 +59,6 @@
     <nav class="top-nav">
       <div class="nav-brand" onclick="navigateTo('dashboard')">Prono<span>Foot</span></div>
       
-      <!-- WIDGET MUSIQUE -->
       <div class="music-widget">
         <div style="display:flex;align-items:center;gap:6px" onclick="toggleSiteMusic()">
           <span id="musicStatusIcon">🎵</span>
@@ -98,7 +95,7 @@
       <div class="page-section active" id="page-dashboard">
         <div class="welcome-banner">
           <h2 id="welcomeMsg">Bienvenue ! 👋</h2>
-          <p>Pronostique les matchs de la saison 2026-27 et grimpe au sommet !</p>
+          <p>Pronostique les matchs de la saison 2026-27 en direct !</p>
         </div>
 
         <div id="kingBannerBox" class="king-banner">
@@ -130,13 +127,19 @@
         <div id="dashboardLeaderboard" style="margin-bottom:20px"></div>
       </div>
 
-      <!-- MATCHS -->
+      <!-- MATCHS (AVEC MODE LIVE & ACTIF / ARCHIVE) -->
       <div class="page-section" id="page-matches">
         <div id="leagueBannerArea"></div>
 
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:10px">
           <h3 id="matchesSectionTitle" class="league-title-special">⚽ Calendrier 2026-27</h3>
           <button class="btn btn-primary btn-sm" onclick="saveAll()" id="btnSavePronos">💾 Sauvegarder Mes Pronos</button>
+        </div>
+
+        <!-- SÉLECTEUR MATCHS ACTIFS VS HISTORIQUE -->
+        <div style="display:flex;gap:10px;margin-bottom:15px">
+          <button class="btn btn-sm btn-primary" id="btnTabUpcoming" onclick="switchMatchView('upcoming')" style="flex:1">🔥 À venir & En Direct</button>
+          <button class="btn btn-sm btn-secondary" id="btnTabFinished" onclick="switchMatchView('finished')" style="flex:1">📜 Matchs Terminés</button>
         </div>
 
         <div class="league-tabs">
@@ -156,6 +159,7 @@
       <!-- CLASSEMENT -->
       <div class="page-section" id="page-leaderboard">
         <h3 style="margin-bottom:5px" class="league-title-special">🏆 Classement Général Cloud</h3>
+        <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:20px">Points recalculés en direct selon l'évolution des matchs !</p>
         <div id="podiumContainer" style="margin-bottom:25px"></div>
         <div id="leaderboardContainer"></div>
       </div>
@@ -179,22 +183,9 @@
             <div class="profile-avatar-overlay" style="position:absolute;inset:0;background:rgba(0,0,0,0.5);border-radius:50%;display:flex;align-items:center;justify-content:center;opacity:0;transition:0.2s"><span style="font-size:1.5rem">📸</span></div>
             <input type="file" accept="image/*" style="display:none" onchange="uploadUserAvatar(event)">
           </label>
-
           <h2 id="profileUsername">-</h2>
           <p id="profileEmail" style="color:var(--text-muted);font-size:0.85rem;margin-bottom:8px">-</p>
           <p id="profileRole" style="color:var(--gold);font-size:0.85rem;font-weight:bold;margin-bottom:20px"></p>
-
-          <div class="stats-grid" style="margin-bottom:15px">
-            <div class="stat-card" style="padding:12px">
-              <div class="val" id="profilePoints" style="font-size:1.5rem;color:var(--accent)">0</div>
-              <div class="lbl" style="font-size:0.7rem">Solde de Points</div>
-            </div>
-            <div class="stat-card" style="padding:12px">
-              <div class="val" id="profileRank" style="font-size:1.5rem;color:var(--gold)">#-</div>
-              <div class="lbl" style="font-size:0.7rem">Rang Officiel</div>
-            </div>
-          </div>
-
           <button class="btn btn-secondary" style="width:100%" onclick="handleLogout()">🚪 Se Déconnecter</button>
         </div>
       </div>
@@ -203,42 +194,16 @@
       <div class="page-section" id="page-admin">
         <h3 class="league-title-special" style="margin-bottom:15px">⚙️ Panneau Administrateur</h3>
 
-        <div class="admin-card" style="border:2px solid var(--accent)">
-          <h4 style="color:var(--accent)">🖼️ Fonds d'Écran du Site</h4>
-          
-          <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:5px">1. Fond de la page de Connexion :</p>
-          <div class="form-group" style="margin-bottom:15px">
-            <label class="btn btn-secondary" style="width:100%;cursor:pointer">
-              📸 Charger fond (Connexion)
-              <input type="file" accept="image/*" style="display:none" onchange="uploadAuthBgFromFile(event)">
-            </label>
-          </div>
-
-          <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:5px">2. Fond de l'Accueil (Dashboard) :</p>
-          <div class="form-group">
-            <label class="btn btn-secondary" style="width:100%;cursor:pointer">
-              📸 Charger fond (Accueil)
-              <input type="file" accept="image/*" style="display:none" onchange="uploadDashboardBgFromFile(event)">
-            </label>
-          </div>
-        </div>
-
         <div class="admin-card" style="border:2px solid var(--gold)">
-          <h4 style="color:var(--gold)">⚡ Synchronization API Sports (Réelle)</h4>
-          <button class="btn btn-gold btn-sm" id="btnSyncApi" style="width:100%" onclick="saveAndSyncApiSports()">⚡ Synchro Vrais Scores</button>
+          <h4 style="color:var(--gold)">⚡ Synchro API Sports (Scores & Minutes Live)</h4>
+          <button class="btn btn-gold btn-sm" id="btnSyncApi" style="width:100%" onclick="saveAndSyncApiSports()">⚡ Lancer Synchro API Directe</button>
+          <p id="apiSyncStatus" style="font-size:0.8rem;margin-top:8px;color:var(--green);font-weight:bold"></p>
         </div>
 
         <div class="admin-grid">
           <div class="admin-card" style="grid-column:1/-1">
-            <h4>⚽ Saisie des Scores Manuelle (+500 matchs)</h4>
-            <div class="form-group" style="margin-bottom:12px">
-              <input type="text" id="adminSearchInput" placeholder="🔍 Rechercher une équipe (ex: PSG, Barca, Arsenal...)" oninput="renderAdminMatchList()">
-            </div>
+            <h4>⚽ Saisie des Scores Manuelle</h4>
             <div id="adminMatchList" style="max-height:420px;overflow-y:auto"></div>
-          </div>
-          <div class="admin-card">
-            <h4>📊 Stats Cloud du Site</h4>
-            <div id="adminStats"></div>
           </div>
         </div>
       </div>

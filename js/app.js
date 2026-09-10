@@ -52,37 +52,43 @@ let appState = {
   users: JSON.parse(localStorage.getItem('pf_local_users')) || [],
   scores: JSON.parse(localStorage.getItem('pf_scores_v3')) || {},
   groups: JSON.parse(localStorage.getItem('pf_groups_v3')) || [],
-  settings: {
-    themeColor: '#00E676', authBgImage: '', dashboardBgImage: '', bgImage: '',
-    leagueBanners: {}, leagueBackgrounds: {}
-  }
+  settings: { themeColor: '#00E676', bgImage: '', apiKey: REAL_API_KEY }
 };
 
 let currentUser = JSON.parse(localStorage.getItem('pf_cloud_session')) || null;
 let currentLeague = 'all';
 let currentMonth = 'all';
+let currentMatchView = 'upcoming'; // 'upcoming' (À venir & Live) ou 'finished' (Terminés)
 
 function getTeamCrest(name) { return TEAM_CRESTS[name] || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=1a1a1c&color=fff&size=64&bold=true`; }
 
-function parseDateDMY(dateStr) {
+// VERROUILLAGE STRICT AU COUP D'ENVOI (DATE + HEURE MINUTE PAR MINUTE)
+function parseMatchDateTime(dateStr, timeStr = "20:00") {
   if (!dateStr) return new Date(2099, 0, 1);
+  let d = 1, m = 1, y = 2026;
   if (dateStr.includes('/')) {
     const parts = dateStr.split('/');
-    if (parts.length === 3) return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]), 23, 59, 59);
-  }
-  if (dateStr.includes('-')) {
+    d = parseInt(parts[0]); m = parseInt(parts[1]); y = parseInt(parts[2]);
+  } else if (dateStr.includes('-')) {
     const parts = dateStr.split('-');
-    return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]), 23, 59, 59);
+    y = parseInt(parts[0]); m = parseInt(parts[1]); d = parseInt(parts[2]);
   }
-  return new Date(dateStr);
+  
+  let hours = 20, minutes = 0;
+  if (timeStr && timeStr.includes(':')) {
+    const tParts = timeStr.split(':');
+    hours = parseInt(tParts[0]); minutes = parseInt(tParts[1]);
+  }
+
+  return new Date(y, m - 1, d, hours, minutes, 0);
 }
 
-function hasMatchStarted(dateStr) {
-  const matchDate = parseDateDMY(dateStr);
-  if (isNaN(matchDate.getTime())) return false;
-  return new Date() > matchDate;
+function hasMatchStarted(dateStr, timeStr) {
+  const matchTime = parseMatchDateTime(dateStr, timeStr);
+  return new Date() >= matchTime;
 }
 
+// COMPRESSION CANVAS
 function compressImage(file, maxWidth, quality, callback) {
   if (!file) return;
   const reader = new FileReader();
@@ -109,7 +115,6 @@ async function uploadUserAvatar(event) {
     currentUser.avatar = dataUrl;
     const idx = appState.users.findIndex(u => u.id === currentUser.id);
     if (idx !== -1) appState.users[idx].avatar = dataUrl;
-    
     localStorage.setItem('pf_cloud_session', JSON.stringify(currentUser));
     if (firestore) { try { await firestore.collection('users').doc(currentUser.id).update({ avatar: dataUrl }); } catch (err) {} }
     updateUI(); renderLeaderboard(); renderDashboardLeaderboard();
@@ -117,29 +122,7 @@ async function uploadUserAvatar(event) {
   });
 }
 
-function uploadAuthBgFromFile(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  compressImage(file, 800, 0.4, async function(dataUrl) {
-    appState.settings.authBgImage = dataUrl;
-    applyTheme();
-    if (firestore) { try { await firestore.collection('settings').doc('global').set({ authBgImage: dataUrl }, { merge: true }); } catch (err) {} }
-    alert("✅ Fond de connexion mis à jour !");
-  });
-}
-
-function uploadDashboardBgFromFile(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  compressImage(file, 800, 0.4, async function(dataUrl) {
-    appState.settings.dashboardBgImage = dataUrl;
-    applyTheme();
-    if (firestore) { try { await firestore.collection('settings').doc('global').set({ dashboardBgImage: dataUrl }, { merge: true }); } catch (err) {} }
-    alert("✅ Fond d'accueil mis à jour !");
-  });
-}
-
-// SYNCHRO API SPORTS
+// SYNCHRO API-SPORTS LIVE & TEMPS RÉEL
 async function saveAndSyncApiSports() {
   const btn = document.getElementById('btnSyncApi');
   if(btn) { btn.innerHTML = "⏳ Recherche des scores réels en cours..."; btn.disabled = true; }
@@ -156,28 +139,38 @@ async function saveAndSyncApiSports() {
     let count = 0;
 
     fixtures.forEach(f => {
-      if (['FT', 'AET', 'PEN'].includes(f.fixture.status.short)) {
-        const hName = f.teams.home.name.toLowerCase();
-        const aName = f.teams.away.name.toLowerCase();
-        const match = ALL_MATCHES.find(m => m.home.toLowerCase().includes(hName) || m.away.toLowerCase().includes(aName));
-        if (match) { appState.scores[match.id] = { h: f.goals.home, a: f.goals.away }; count++; }
+      const status = f.fixture.status.short;
+      const homeName = f.teams.home.name.toLowerCase();
+      const awayName = f.teams.away.name.toLowerCase();
+
+      const match = ALL_MATCHES.find(m => m.home.toLowerCase().includes(homeName) || m.away.toLowerCase().includes(awayName));
+
+      if (match) {
+        if (['1H','HT','2H','ET','P','LIVE'].includes(status)) {
+          // MATCH EN DIRECT
+          appState.scores[match.id] = { h: f.goals.home, a: f.goals.away, status: 'LIVE', elapsed: f.fixture.status.elapsed };
+          count++;
+        } else if (['FT','AET','PEN'].includes(status)) {
+          // MATCH TERMINÉ
+          appState.scores[match.id] = { h: f.goals.home, a: f.goals.away, status: 'FINISHED' };
+          count++;
+        }
       }
     });
 
     localStorage.setItem('pf_scores_v3', JSON.stringify(appState.scores));
     if (firestore) { await firestore.collection('settings').doc('global').set({ scores: appState.scores }, { merge: true }); }
 
-    recalculateAllCloudPoints(); updateUI(); renderMatches(); renderLeaderboard(); renderDashboardLeaderboard(); renderAdminMatchList();
-    
+    recalculateAllCloudPoints(); updateUI(); renderMatches(); renderLeaderboard(); renderDashboardLeaderboard();
     if(btn) { btn.innerHTML = "⚡ Synchro Vrais Scores"; btn.disabled = false; }
-    alert(`✅ Merveilleux ! ${count} score(s) réel(s) synchronisé(s) depuis l'API !`);
+    alert(`✅ ${count} match(s) en direct ou terminé(s) actualisé(s) !`);
   } catch (err) {
     if(btn) { btn.innerHTML = "⚡ Synchro Vrais Scores"; btn.disabled = false; }
     alert("❌ Erreur API : " + err.message);
   }
 }
 
-// FIREBASE CLOUD LISTENERS
+// LISTEN CLOUD DATA
 function listenCloudData() {
   if (!firestore) return;
   
@@ -217,30 +210,19 @@ function recalculateAllCloudPoints() {
 }
 
 function getUserStats(u) {
-  let ex=0, co=0, wr=0;
-  let total = Object.keys(u.preds || {}).length;
+  let ex=0, co=0;
   for (const [id, p] of Object.entries(u.preds || {})) {
     const s = appState.scores[id];
-    if (s) { const pts = calcPts(p, s); if (pts===5) ex++; else if (pts===3) co++; else wr++; }
+    if (s) { const pts = calcPts(p, s); if (pts===5) ex++; else if (pts===3) co++; }
   }
-  let winRate = total > 0 ? (((ex + co) / total) * 100).toFixed(0) : 0;
-  let exactRate = total > 0 ? ((ex / total) * 100).toFixed(0) : 0;
-  return { exact:ex, correct:co, wrong:wr, total, winRate, exactRate };
+  return { exact:ex, correct:co, total:Object.keys(u.preds||{}).length };
 }
 
 function getSorted() { return [...appState.users].sort((a,b) => b.points - a.points); }
-function getAvatarColor(u) { return AVATAR_COLORS[(u||'A').charCodeAt(0)%AVATAR_COLORS.length]; }
 
 function applyTheme() {
   document.documentElement.style.setProperty('--accent', appState.settings.themeColor || '#00E676');
-  const authScreen = document.getElementById('authScreen');
-  if (authScreen) authScreen.style.backgroundImage = appState.settings.authBgImage ? `url('${appState.settings.authBgImage}')` : 'none';
-  
   let bg = appState.settings.bgImage;
-  if (currentLeague === 'dashboard' && appState.settings.dashboardBgImage) bg = appState.settings.dashboardBgImage;
-  else if (currentLeague !== 'all' && currentLeague !== 'dashboard' && LEAGUE_INFO[currentLeague]) {
-    bg = (appState.settings.leagueBackgrounds && appState.settings.leagueBackgrounds[currentLeague]) || LEAGUE_INFO[currentLeague].defaultBg;
-  }
   document.documentElement.style.setProperty('--bg-image', bg ? `url('${bg}')` : 'none');
 }
 
@@ -262,7 +244,7 @@ function setupApp() {
   if (currentUser && currentUser.role === 'admin') {
     document.getElementById('adminNavBtn').style.display = 'flex';
     document.getElementById('topAdminBtn').style.display = 'block';
-    renderAdminMatchList(); renderAdminStats();
+    renderAdminMatchList();
   } else {
     document.getElementById('adminNavBtn').style.display = 'none';
     document.getElementById('topAdminBtn').style.display = 'none';
@@ -303,11 +285,11 @@ async function handleLogin(e) {
     currentUser = found;
     localStorage.setItem('pf_cloud_session', JSON.stringify(currentUser));
     document.getElementById('authScreen').style.display = 'none';
-    setupApp(); btn.innerText = "Se connecter →"; btn.disabled = false; return;
+    setupApp();
+  } else {
+    document.getElementById('authError').textContent = 'Identifiant ou mot de passe incorrect.';
+    document.getElementById('authError').style.display = 'block';
   }
-
-  document.getElementById('authError').textContent = 'Identifiant ou mot de passe incorrect.';
-  document.getElementById('authError').style.display = 'block';
   btn.innerText = "Se connecter →"; btn.disabled = false;
 }
 
@@ -350,90 +332,127 @@ function setupMonthFilter() {
 function filterByMonth(m) { currentMonth = m; document.querySelectorAll('#monthFilterBar .matchday-pill').forEach(b => b.classList.remove('active')); if (event && event.target) event.target.classList.add('active'); renderMatches(); }
 function filterLeague(l) { currentLeague = l; applyTheme(); document.querySelectorAll('#page-matches .league-tab').forEach(t => t.classList.remove('active')); if (event && event.target) event.target.classList.add('active'); renderMatches(); }
 
-// VISIBILITÉ DES PRONOSTICS DES AUTRES (VOIR QUI A PRONOSTIQUÉ AVANT MATCH)
-function toggleMatchPredictions(matchId, matchDateStr) {
+function switchMatchView(viewMode) {
+  currentMatchView = viewMode;
+  document.getElementById('btnTabUpcoming').className = viewMode === 'upcoming' ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-secondary';
+  document.getElementById('btnTabFinished').className = viewMode === 'finished' ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-secondary';
+  renderMatches();
+}
+
+// VISIONNAGE ET ANTI-TRICHE DES PRONOSTICS
+function toggleMatchPredictions(matchId, matchDateStr, timeStr) {
   const el = document.getElementById('all_preds_' + matchId);
   if (!el) return;
 
-  const started = hasMatchStarted(matchDateStr);
+  const started = hasMatchStarted(matchDateStr, timeStr);
   const isAdmin = (currentUser && currentUser.role === 'admin');
 
   if (el.style.display === 'none') {
+    if (!started && !isAdmin) {
+      alert("🔒 Anti-Triche : Les pronostics de vos amis seront visibles dès le coup d'envoi du match !");
+      return;
+    }
+
     const score = appState.scores[matchId];
     let html = '<div style="font-weight:bold;color:var(--gold);margin-bottom:8px;border-bottom:1px solid var(--border);padding-bottom:4px">👥 Pronostics des joueurs :</div>';
     let count = 0;
-
     appState.users.forEach(u => {
       const pred = u.preds && u.preds[matchId];
       if (pred && pred.h !== '' && pred.a !== '') {
         count++;
-        if (!started && !isAdmin) {
-          // Masqué jusqu'au coup d'envoi pour éviter la triche
-          html += `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:0.85rem"><span><strong>${u.username}</strong></span><span style="margin-left:auto;color:var(--green)">✔️ A parié</span></div>`;
-        } else {
-          let resLbl = '';
-          if (score) { const pts = calcPts(pred, score); resLbl = `<span class="${pts===5?'pts-exact':pts===3?'pts-correct':'pts-wrong'}" style="margin-left:auto;font-weight:bold">(+${pts} pts)</span>`; }
-          html += `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:0.85rem"><span style="flex:1"><strong>${u.username}</strong></span><span style="background:var(--bg-body);padding:2px 8px;border-radius:4px;font-weight:bold">${pred.h} - ${pred.a}</span>${resLbl}</div>`;
-        }
+        let resLbl = '';
+        if (score) { const pts = calcPts(pred, score); resLbl = `<span class="${pts===5?'pts-exact':pts===3?'pts-correct':'pts-wrong'}" style="margin-left:auto;font-weight:bold">(+${pts} pts)</span>`; }
+        html += `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:0.85rem"><span style="flex:1"><strong>${u.username}</strong></span><span style="background:var(--bg-body);padding:2px 8px;border-radius:4px;font-weight:bold">${pred.h} - ${pred.a}</span>${resLbl}</div>`;
       }
     });
-
-    if (count === 0) html += '<p style="color:var(--text-muted);font-size:0.8rem">Aucun joueur n\'a encore pronostiqué ce match.</p>';
+    if (count === 0) html += '<p style="color:var(--text-muted);font-size:0.8rem">Aucun joueur n\'a pronostiqué ce match.</p>';
     el.innerHTML = html; el.style.display = 'block';
   } else { el.style.display = 'none'; }
 }
 
+// RENDU DYNAMIQUE DES MATCHS AVEC HEURES ET BADGES EN DIRECT
 function renderMatches() {
   const container = document.getElementById('matchesContainer');
   let list = ALL_MATCHES;
+
   if (currentLeague !== 'all') list = list.filter(m => m.league === currentLeague);
   if (currentMonth !== 'all') { list = list.filter(m => { const parts = m.date.split('/'); return parts.length === 3 && parts[1] === currentMonth; }); }
-  if (list.length === 0) { container.innerHTML = '<p style="text-align:center;color:var(--text-muted);padding:40px">Aucun match trouvé pour ce filtre.</p>'; return; }
+
+  // Filtre Mode Vue (À venir/Live VS Terminés)
+  if (currentMatchView === 'upcoming') {
+    list = list.filter(m => !appState.scores[m.id] || appState.scores[m.id].status === 'LIVE');
+  } else {
+    list = list.filter(m => appState.scores[m.id] && appState.scores[m.id].status !== 'LIVE');
+  }
+
+  if (list.length === 0) {
+    container.innerHTML = '<p style="text-align:center;color:var(--text-muted);padding:40px">Aucun match trouvé pour cette sélection.</p>';
+    return;
+  }
 
   let html = '';
   list.forEach(m => {
-    // PRONO DU JOUEUR CONNECTÉ
     const pred = (currentUser && currentUser.preds && currentUser.preds[m.id]) || { h:'', a:'' };
     const score = appState.scores[m.id];
-    const done = !!score;
-    const started = hasMatchStarted(m.date);
-    const li = LEAGUE_INFO[m.league] || { name:m.league, flag:'⚽' };
-    let totalPreds = 0; appState.users.forEach(u => { if (u.preds && u.preds[m.id] && u.preds[m.id].h !== '') totalPreds++; });
+    const matchTimeStr = m.time || "20:45";
+    const started = hasMatchStarted(m.date, matchTimeStr);
+    const isLive = score && score.status === 'LIVE';
+    const isFinished = score && (score.status === 'FINISHED' || !isLive);
+
+    let statusBadgeHtml = `<span class="status-badge status-upcoming">⏳ ${matchTimeStr}</span>`;
+    if (isLive) {
+      statusBadgeHtml = `<span class="status-badge status-live">🔴 LIVE ${score.elapsed || 45}'</span>`;
+    } else if (isFinished && score) {
+      statusBadgeHtml = `<span class="status-badge status-finished">✅ TERMINÉ</span>`;
+    }
 
     let res = '';
-    if (done) {
+    if (isFinished && score) {
       const pts = calcPts(pred, score);
       const cls = pts===5?'pts-exact':pts===3?'pts-correct':'pts-wrong';
       const lbl = pts===5?'🎯 Score Exact (+5 pts)':pts===3?'✅ Bon Vainqueur (+3 pts)':'❌ Incorrect (0 pt)';
       res = `<div class="match-result-badge ${cls}">Score Final : ${score.h} - ${score.a} | ${lbl}</div>`;
     }
 
-    const disableInput = (done) ? 'disabled' : '';
+    // VERROUILLAGE AUTOMATIQUE ET STRICT DE LA SAISIE AU COUP D'ENVOI
+    const disableInput = (started || isLive || (isFinished && score)) ? 'disabled' : '';
+    const lockNotice = (disableInput && !isFinished) ? '<span style="font-size:0.75rem;color:var(--danger);font-weight:bold">🔒 Pronostics Fermés</span>' : '';
 
     html += `
-      <div class="match-card ${done?'finished':''}">
-        <div class="match-header"><span>${li.flag} <strong>${li.name}</strong></span><span style="color:var(--gold)">📅 ${m.date}</span></div>
+      <div class="match-card ${isLive ? 'is-live' : ''} ${isFinished ? 'finished' : ''}">
+        <div class="match-header">
+          <span><strong>${m.league}</strong></span>
+          <div>
+            ${statusBadgeHtml}
+            <span style="color:var(--gold);margin-left:8px">📅 ${m.date}</span>
+          </div>
+        </div>
         <div class="match-teams">
           <div class="match-team home"><span>${m.home}</span><img src="${getTeamCrest(m.home)}" class="team-crest"></div>
-          <div class="match-vs">${done ? score.h + ' - ' + score.a : 'VS'}</div>
+          <div class="match-vs">${(score && (isLive || isFinished)) ? `${score.h} - ${score.a}` : 'VS'}</div>
           <div class="match-team away"><img src="${getTeamCrest(m.away)}" class="team-crest"><span>${m.away}</span></div>
         </div>
-        ${!done ? `<div class="match-prediction">
+        
+        <div style="text-align:center;margin-bottom:6px">${lockNotice}</div>
+
+        ${(!isFinished || isLive) ? `
+        <div class="match-prediction">
           <input type="number" min="0" max="15" value="${pred.h}" id="h_${m.id}" placeholder="H" ${disableInput}>
           <span>:</span>
           <input type="number" min="0" max="15" value="${pred.a}" id="a_${m.id}" placeholder="A" ${disableInput}>
         </div>` : ''}
+        
         ${res}
-        <div style="text-align:center;margin-top:12px;border-top:1px solid var(--border);padding-top:8px">
-          <button class="btn btn-secondary btn-xs" onclick="toggleMatchPredictions('${m.id}', '${m.date}')">👥 Voir les pronos de tous (${totalPreds})</button>
+        
+        <div style="text-align:center;margin-top:12px;border-top:1px dashed var(--border);padding-top:8px">
+          <button class="btn btn-secondary btn-xs" onclick="toggleMatchPredictions('${m.id}', '${m.date}', '${matchTimeStr}')">👥 Voir les pronos des autres</button>
         </div>
-        <div id="all_preds_${m.id}" style="display:none;margin-top:10px;padding:10px;background:var(--bg-body);border-radius:8px;border:1px solid var(--border)"></div>
+        <div id="all_preds_${m.id}" style="display:none;margin-top:10px;padding:10px;background:#111;border-radius:8px;border:1px solid var(--border)"></div>
       </div>`;
   });
   container.innerHTML = html;
 }
 
-// SAUVEGARDE EN DIRECT FIREBASE
 async function saveAll() {
   if (!currentUser) return;
   if (!currentUser.preds) currentUser.preds = {};
@@ -450,27 +469,11 @@ async function saveAll() {
     }
   });
 
-  const idx = appState.users.findIndex(u => u.id === currentUser.id);
-  if (idx !== -1) appState.users[idx] = currentUser;
-
-  if (firestore) {
-    try { await firestore.collection('users').doc(currentUser.id).set({ preds: currentUser.preds }, { merge: true }); } catch (err) {}
-  }
-  
+  if (firestore) { try { await firestore.collection('users').doc(currentUser.id).update({ preds: currentUser.preds }); } catch (err) {} }
   localStorage.setItem('pf_cloud_session', JSON.stringify(currentUser));
   recalculateAllCloudPoints(); updateUI(); renderMatches(); renderLeaderboard(); renderDashboardLeaderboard();
   
-  if(btn) { btn.innerHTML = "✅ "+count+" Enregistrés"; btn.disabled = false; setTimeout(()=>{btn.innerHTML="💾 Sauvegarder Mes Pronos";}, 2000); }
-}
-
-function shareChallengeWhatsApp() {
-  if (!currentUser) return;
-  const sorted = getSorted();
-  const rank = sorted.findIndex(u => u.id === currentUser.id) + 1;
-  const st = getUserStats(currentUser);
-  const url = window.location.href;
-  const msg = `🏆 *PRONOFOOT 2026-27*\n👤 Joueur : *${currentUser.username}*\n⭐ Points : *${currentUser.points} pts*\n🥇 Rang : *#${rank > 0 ? rank : 1}*\n📈 Réussite : *${st.winRate}%*\n\n🔥 Rejoins-moi et fais tes pronostics :\n👉 ${url}`;
-  window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`, '_blank');
+  if(btn) { btn.innerHTML = "✅ "+count+" Sauvegardés"; btn.disabled = false; setTimeout(()=>{btn.innerHTML="💾 Sauvegarder Mes Pronos";}, 2000); }
 }
 
 function updateUI() {
@@ -495,12 +498,6 @@ function updateUI() {
   document.getElementById('profileRole').textContent = currentUser.role === 'admin' ? '⭐ Administrateur' : '🎮 Joueur';
   document.getElementById('profilePoints').textContent = currentUser.points || 0;
   document.getElementById('profileRank').textContent = rankStr;
-
-  const profAv = document.getElementById('profileBigAvatar');
-  if (profAv) {
-    if (currentUser.avatar) { profAv.textContent = ''; profAv.style.backgroundImage = `url('${currentUser.avatar}')`; profAv.style.backgroundSize = 'cover'; } 
-    else { profAv.style.backgroundImage = 'none'; profAv.textContent = (currentUser.username || 'A')[0].toUpperCase(); }
-  }
 
   if (sorted[0]) {
     document.getElementById('kingUsername').textContent = sorted[0].username;
@@ -545,21 +542,10 @@ async function adminSaveScore(id) {
   const h = parseInt(document.getElementById('ah_' + id)?.value);
   const a = parseInt(document.getElementById('aa_' + id)?.value);
   if (isNaN(h) || isNaN(a)) { alert('Entrez les 2 scores !'); return; }
-  appState.scores[id] = { h, a };
+  appState.scores[id] = { h, a, status: 'FINISHED' };
   if (firestore) { try { await firestore.collection('settings').doc('global').set({ scores: appState.scores }, { merge: true }); } catch (e) {} }
   recalculateAllCloudPoints(); updateUI(); renderMatches(); renderLeaderboard(); renderDashboardLeaderboard();
   alert('Score enregistré !');
-}
-
-function renderAdminStats() {
-  const t = ALL_MATCHES.length;
-  const s = Object.keys(appState.scores).length;
-  const p = appState.users.reduce((a, u) => a + Object.keys(u.preds || {}).length, 0);
-  document.getElementById('adminStats').innerHTML = `
-    <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)"><span>Matchs 2026-27</span><strong>${t}</strong></div>
-    <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)"><span>Scores validés</span><strong style="color:var(--green)">${s}</strong></div>
-    <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)"><span>Joueurs inscrits</span><strong>${appState.users.length}</strong></div>
-    <div style="display:flex;justify-content:space-between;padding:6px 0"><span>Pronostics totaux sur le site</span><strong style="color:var(--gold);font-size:1.2rem">${p}</strong></div>`;
 }
 
 function navigateTo(p) {
