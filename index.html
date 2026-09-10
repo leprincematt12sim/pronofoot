@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PronoFoot PRO</title>
   <link rel="stylesheet" href="css/main.css">
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -16,39 +16,23 @@
   <div class="auth-overlay" id="authScreen" style="display:none">
     <div class="auth-card">
       <div style="text-align:center;margin-bottom:20px">
-        <h1 style="font-size:2.5rem;color:var(--accent)">Prono<span>Foot</span></h1>
-        <p data-i18n="auth_sub">Saison 2026-27 — Multijoueur</p>
+        <h1 style="font-size:2.5rem;color:var(--text-main)">Prono<span style="color:var(--accent)">Foot</span></h1>
+        <p data-i18n="auth_sub" style="color:var(--text-muted);font-size:0.85rem;text-transform:uppercase;font-weight:bold;margin-top:5px">Saison 2026-27</p>
       </div>
-      <div style="display:flex;gap:10px;margin-bottom:20px">
-        <button class="btn btn-secondary" style="flex:1" onclick="switchAuth('login')" id="tabLogin" data-i18n="btn_login">Connexion</button>
-        <button class="btn btn-secondary" style="flex:1" onclick="switchAuth('register')" id="tabReg" data-i18n="btn_register">Inscription</button>
-      </div>
-      <div id="authError" style="color:var(--danger);font-size:0.85rem;margin-bottom:12px;text-align:center;font-weight:bold"></div>
 
       <form id="loginForm" onsubmit="handleLogin(event)">
         <div class="form-group"><label data-i18n="email">Email / Pseudo</label><input type="text" id="loginEmail" required></div>
         <div class="form-group"><label data-i18n="password">Mot de passe</label><input type="password" id="loginPass" required></div>
-        <button type="submit" class="btn btn-primary" style="width:100%" data-i18n="btn_login_submit">Se connecter →</button>
-        <div style="text-align:center;margin-top:10px">
-          <a style="color:var(--gold);font-size:0.8rem;cursor:pointer" onclick="quickAdminLogin()">⭐ Connexion VIP Admin</a>
-        </div>
-      </form>
-
-      <form id="registerForm" style="display:none" onsubmit="handleRegister(event)">
-        <div class="form-group"><label data-i18n="pseudo">Pseudo</label><input type="text" id="regUser" required></div>
-        <div class="form-group"><label data-i18n="email">Email</label><input type="email" id="regEmail" required></div>
-        <div class="form-group"><label data-i18n="password">Mot de passe</label><input type="password" id="regPass" required></div>
-        <button type="submit" class="btn btn-primary" style="width:100%" data-i18n="btn_register_submit">Créer mon compte →</button>
+        <button type="submit" class="btn btn-primary" style="width:100%" data-i18n="btn_login_submit">Se connecter</button>
+        <button type="button" class="btn btn-secondary" style="width:100%;margin-top:10px" onclick="quickAdminLogin()">⭐ Connexion ADMIN</button>
       </form>
     </div>
   </div>
 
   <div id="appContainer">
-    <!-- BARRE DU HAUT -->
     <nav class="top-nav">
       <div class="nav-brand" onclick="navigateTo('dashboard')">Prono<span>Foot</span></div>
-      <div class="nav-tools">
-        <!-- SELECTEUR DE LANGUES -->
+      <div style="display:flex;align-items:center;gap:15px">
         <div class="lang-selector">
           <span onclick="setLanguage('fr')">🇫🇷</span>
           <span onclick="setLanguage('en')">🇬🇧</span>
@@ -58,56 +42,30 @@
       </div>
     </nav>
 
-    <!-- BARRE DU BAS (TOUJOURS VISIBLE) -->
     <nav class="bottom-nav">
       <button class="bottom-nav-item active" onclick="navigateTo('dashboard')"><span>🏠</span><span data-i18n="nav_home">Accueil</span></button>
       <button class="bottom-nav-item" onclick="navigateTo('matches')"><span>⚽</span><span data-i18n="nav_matches">Matchs</span></button>
       <button class="bottom-nav-item" onclick="navigateTo('leaderboard')"><span>🏆</span><span data-i18n="nav_rank">Classement</span></button>
-      <button class="bottom-nav-item" onclick="navigateTo('groups')"><span>👥</span><span data-i18n="nav_groups">Groupes</span></button>
       <button class="bottom-nav-item" onclick="navigateTo('admin')" id="adminNavBtn" style="display:none"><span>⚙️</span><span data-i18n="nav_admin">Admin</span></button>
     </nav>
 
     <div class="main-content">
-
-      <!-- ACCUEIL -->
+      <!-- DASHBOARD -->
       <div class="page-section active" id="page-dashboard">
-        <h2 style="margin-bottom:20px;font-size:1.8rem" id="welcomeMsg">Bienvenue ! 👋</h2>
-        
-        <div id="announcementBox" style="display:none;background:rgba(255,215,0,0.1);border:1px solid var(--gold);padding:15px;border-radius:8px;margin-bottom:20px;color:var(--gold);font-weight:bold"></div>
-
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
-          <div style="background:var(--bg-card);padding:15px;border-radius:12px;text-align:center;border:1px solid var(--border)">
-            <div id="statPoints" style="font-size:2rem;font-weight:900;color:var(--accent)">0</div>
-            <div style="font-size:0.8rem;color:var(--text-muted);text-transform:uppercase" data-i18n="my_points">Mes Points</div>
-          </div>
-          <div style="background:var(--bg-card);padding:15px;border-radius:12px;text-align:center;border:1px solid var(--border)">
-            <div id="statRank" style="font-size:2rem;font-weight:900;color:var(--gold)">#-</div>
-            <div style="font-size:0.8rem;color:var(--text-muted);text-transform:uppercase" data-i18n="my_rank">Mon Classement</div>
-          </div>
+        <h2 style="margin-bottom:20px" data-i18n="welcome">Bienvenue ! 👋</h2>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px">
+          <div class="admin-card" style="text-align:center;padding:15px"><div id="statPoints" style="font-size:2rem;font-weight:900;color:var(--accent)">0</div><div style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase">Points</div></div>
+          <div class="admin-card" style="text-align:center;padding:15px"><div id="statRank" style="font-size:2rem;font-weight:900;color:var(--gold)">#-</div><div style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase">Rang</div></div>
         </div>
-
-        <button class="btn btn-primary" style="width:100%;padding:15px;font-size:1.1rem;margin-bottom:25px" onclick="navigateTo('matches')" data-i18n="btn_predict">
-          ⚽ Pronostiquer les matchs →
-        </button>
-
-        <h3 class="league-title-special" data-i18n="top_5">🏆 Top 5 Général</h3>
-        <div id="dashboardLeaderboard"></div>
+        <button class="btn btn-primary" style="width:100%;padding:15px;margin-bottom:20px" onclick="navigateTo('matches')" data-i18n="btn_predict">⚽ Pronostiquer les matchs</button>
       </div>
 
       <!-- MATCHS -->
       <div class="page-section" id="page-matches">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px">
           <h3 class="league-title-special" data-i18n="nav_matches">⚽ Matchs</h3>
-          <button class="btn btn-primary btn-sm" onclick="saveAll()" id="btnSavePronos" data-i18n="btn_save">💾 Sauvegarder</button>
+          <button class="btn btn-primary btn-sm" onclick="saveAll()" data-i18n="btn_save">💾 Sauvegarder</button>
         </div>
-        
-        <div style="display:flex;gap:10px;margin-bottom:15px;overflow-x:auto;padding-bottom:5px">
-          <button class="btn btn-sm btn-primary" onclick="filterLeague('all')" data-i18n="all_matches">🌍 Tous</button>
-          <button class="btn btn-sm btn-secondary" onclick="filterLeague('champions')">🏆 UCL</button>
-          <button class="btn btn-sm btn-secondary" onclick="filterLeague('premier')">🏴 PL</button>
-          <button class="btn btn-sm btn-secondary" onclick="filterLeague('ligue1')">🇫🇷 L1</button>
-        </div>
-
         <div id="matchesContainer"></div>
       </div>
 
@@ -117,67 +75,35 @@
         <div id="leaderboardContainer"></div>
       </div>
 
-      <!-- GROUPES -->
-      <div class="page-section" id="page-groups">
-        <h3 class="league-title-special" data-i18n="nav_groups">👥 Groupes Privés</h3>
-        <div style="display:flex;gap:10px;margin-bottom:20px">
-          <button class="btn btn-primary" style="flex:1" onclick="createGroup()" data-i18n="btn_create_group">➕ Créer</button>
-          <button class="btn btn-gold" style="flex:1" onclick="joinGroup()" data-i18n="btn_join_group">🔑 Rejoindre</button>
-        </div>
-        <div id="groupsListContainer"></div>
-      </div>
-
-      <!-- ADMIN (BIEN RANGÉ PAR CATÉGORIES) -->
+      <!-- ADMIN COMPLET (TOUS LES OUTILS) -->
       <div class="page-section" id="page-admin">
         <h3 class="league-title-special">⚙️ Espace Administrateur</h3>
 
-        <!-- CAT 1 : SCORES & API -->
-        <div class="admin-category">
-          <h3>⚡ Scores & Résultats</h3>
-          <button class="btn btn-gold" style="width:100%;margin-bottom:10px" onclick="saveAndSyncApiSports()" id="btnSyncApi">🔄 Lancer la Synchro API Sports</button>
-          <div style="display:flex;gap:10px;margin-bottom:15px">
-            <button class="btn btn-primary btn-sm" style="flex:1" onclick="adminSimulateLiveMatch()">🔴 Test LIVE</button>
-            <button class="btn btn-danger btn-sm" style="flex:1" onclick="adminResetScores()">🗑️ Reset</button>
-          </div>
-          <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:5px">Saisie manuelle (+500 matchs) :</p>
+        <div class="admin-card" style="border:1px solid var(--accent)">
+          <h4 style="color:var(--accent);margin-bottom:10px">⚡ API Sports (Vrais Scores)</h4>
+          <button class="btn btn-gold" style="width:100%" onclick="saveAndSyncApiSports()">🔄 Synchroniser les scores en direct</button>
+        </div>
+
+        <div class="admin-card" style="border:1px solid var(--danger)">
+          <h4 style="color:var(--danger);margin-bottom:10px">🔴 Testeur LIVE</h4>
+          <button class="btn btn-danger" style="width:100%" onclick="adminSimulateLiveMatch()">🔴 Forcer 3 Matchs en LIVE</button>
+        </div>
+
+        <div class="admin-card">
+          <h4 style="color:var(--gold);margin-bottom:10px">⚽ Saisie Manuelle (+500 matchs)</h4>
           <input type="text" id="adminSearchInput" placeholder="🔍 Rechercher (ex: PSG)..." style="width:100%;padding:10px;margin-bottom:10px;background:#000;color:white;border:1px solid var(--border);border-radius:6px;" oninput="renderAdminMatchList()">
           <div id="adminMatchList" style="max-height:300px;overflow-y:auto;border:1px solid var(--border);padding:10px;border-radius:8px"></div>
         </div>
 
-        <!-- CAT 2 : DESIGN & APPARENCE -->
-        <div class="admin-category">
-          <h3>🎨 Design & Thème</h3>
-          <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:5px">Couleur principale du site :</p>
-          <div style="display:flex;gap:10px;margin-bottom:20px">
-            <div class="theme-dot active" style="background:#00E676" onclick="changeTheme('#00E676')"></div>
+        <div class="admin-card">
+          <h4 style="margin-bottom:10px">🎨 Thème</h4>
+          <div style="display:flex;gap:10px">
+            <div class="theme-dot" style="background:#00E676" onclick="changeTheme('#00E676')"></div>
             <div class="theme-dot" style="background:#e94560" onclick="changeTheme('#e94560')"></div>
             <div class="theme-dot" style="background:#6c5ce7" onclick="changeTheme('#6c5ce7')"></div>
             <div class="theme-dot" style="background:#FFD700" onclick="changeTheme('#FFD700')"></div>
           </div>
-          
-          <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:5px">Images de fond globales :</p>
-          <label class="btn btn-secondary btn-sm" style="display:block;margin-bottom:8px;text-align:center;cursor:pointer">
-            📸 Modifier Fond Accueil <input type="file" accept="image/*" style="display:none" onchange="uploadDashboardBgFromFile(event)">
-          </label>
         </div>
-
-        <!-- CAT 3 : MUSIQUE -->
-        <div class="admin-category">
-          <h3>🎵 Musique de Fond</h3>
-          <label class="btn btn-secondary btn-sm" style="display:block;text-align:center;cursor:pointer;margin-bottom:10px">
-            ➕ Ajouter un fichier MP3
-            <input type="file" accept="audio/*" style="display:none" onchange="adminAddMusic(event)">
-          </label>
-          <div id="adminPlaylistList" style="background:#000;padding:10px;border-radius:8px;font-size:0.8rem"></div>
-        </div>
-
-        <!-- CAT 4 : COMMUNICATION -->
-        <div class="admin-category">
-          <h3>📢 Annonce aux joueurs</h3>
-          <input type="text" id="adminAnnounceInput" placeholder="Message général..." style="width:100%;padding:10px;margin-bottom:10px;background:#000;color:white;border:1px solid var(--border);border-radius:6px;">
-          <button class="btn btn-primary" style="width:100%" onclick="adminPublishAnnouncement()">Publier l'Annonce</button>
-        </div>
-
       </div>
     </div>
   </div>
